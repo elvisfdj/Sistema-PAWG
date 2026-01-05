@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Numeração - Compartilhado</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function ControleNumeracao() {
+            const [documentos, setDocumentos] = useState([]);
+            const [filtroTipo, setFiltroTipo] = useState('TODOS');
+            const [filtroSetor, setFiltroSetor] = useState('');
+            const [anoAtual] = useState(new Date().getFullYear());
+            const [carregando, setCarregando] = useState(true);
+            const [salvando, setSalvando] = useState(false);
+            
+            const [novoDoc, setNovoDoc] = useState({
+                tipo: 'EDITAL',
+                data: new Date().toISOString().split('T')[0],
+                setorOrigem: '',
+                setorDestino: '',
+                observacao: ''
+            });
+
+            useEffect(() => {
+                carregarDados();
+            }, []);
+
+            const carregarDados = async () => {
+                setCarregando(true);
+                try {
+                    const result = await window.storage.get('documentos-controle', true);
+                    if (result && result.value) {
+                        setDocumentos(JSON.parse(result.value));
+                    }
+                } catch (error) {
+                    console.log('Nenhum dado compartilhado ainda');
+                    setDocumentos([]);
+                }
+                setCarregando(false);
+            };
+
+            const salvarDados = async (dados) => {
+                setSalvando(true);
+                try {
+                    await window.storage.set('documentos-controle', JSON.stringify(dados), true);
+                } catch (error) {
+                    console.error('Erro ao salvar:', error);
+                    alert('Erro ao salvar dados. Tente novamente.');
+                }
+                setSalvando(false);
+            };
+
+            const obterProximoNumero = (tipo) => {
+                const docsDoTipo = documentos.filter(d => d.tipo === tipo);
+                return docsDoTipo.length + 1;
+            };
+
+            const adicionarDocumento = async () => {
+                if (!novoDoc.setorOrigem.trim()) {
+                    alert('Por favor, preencha o Setor de Origem');
+                    return;
+                }
+
+                // Recarrega dados antes de adicionar para evitar conflitos
+                await carregarDados();
+
+                const numero = obterProximoNumero(novoDoc.tipo);
+                const numeroFormatado = `${String(numero).padStart(4, '0')}/${anoAtual}`;
+                
+                const documento = {
+                    id: Date.now(),
+                    ...novoDoc,
+                    numero: numeroFormatado,
+                    numeroSequencial: numero,
+                    criadoPor: 'Usuário',
+                    criadoEm: new Date().toISOString()
+                };
+
+                const novosDocumentos = [...documentos, documento];
+                setDocumentos(novosDocumentos);
+                await salvarDados(novosDocumentos);
+
+                setNovoDoc({
+                    tipo: 'EDITAL',
+                    data: new Date().toISOString().split('T')[0],
+                    setorOrigem: '',
+                    setorDestino: '',
+                    observacao: ''
+                });
+
+                alert('✅ Documento adicionado com sucesso!');
+            };
+
+            const removerDocumento = async (id) => {
+                if (confirm('Deseja realmente excluir este documento?')) {
+                    await carregarDados();
+                    const novosDocumentos = documentos.filter(d => d.id !== id);
+                    setDocumentos(novosDocumentos);
+                    await salvarDados(novosDocumentos);
+                }
+            };
+
+            const atualizarDados = async () => {
+                await carregarDados();
+                alert('✅ Dados atualizados!');
+            };
+
+            const exportarParaCSV = () => {
+                const headers = ['Tipo', 'Número', 'Data', 'Setor Origem', 'Setor Destino', 'Observação'];
+                const rows = documentosFiltrados.map(d => [
+                    d.tipo,
+                    d.numero,
+                    new Date(d.data).toLocaleDateString('pt-BR'),
+                    d.setorOrigem,
+                    d.setorDestino,
+                    d.observacao
+                ]);
+
+                const csv = [headers, ...rows]
+                    .map(row => row.map(cell => `"${cell}"`).join(','))
+                    .join('\n');
+
+                const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `controle_documentos_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+            };
+
+            const documentosFiltrados = documentos.filter(d => {
+                const tipoMatch = filtroTipo === 'TODOS' || d.tipo === filtroTipo;
+                const setorMatch = !filtroSetor || 
+                    d.setorOrigem.toLowerCase().includes(filtroSetor.toLowerCase()) ||
+                    d.setorDestino.toLowerCase().includes(filtroSetor.toLowerCase());
+                return tipoMatch && setorMatch;
+            });
+
+            const estatisticas = {
+                EDITAL: documentos.filter(d => d.tipo === 'EDITAL').length,
+                OFICIO: documentos.filter(d => d.tipo === 'OFICIO').length,
+                MEMORANDO: documentos.filter(d => d.tipo === 'MEMORANDO').length
+            };
+
+            if (carregando) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-4"></div>
+                            <p className="text-xl text-gray-700">Carregando dados compartilhados...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                                        Controle de Numeração de Documentos
+                                    </h1>
+                                    <p className="text-gray-600">Ano: {anoAtual} | 🌐 Base Compartilhada</p>
+                                </div>
+                                <button
+                                    onClick={atualizarDados}
+                                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-2"
+                                    disabled={salvando}
+                                >
+                                    🔄 Atualizar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+                            <p className="text-yellow-800">
+                                <strong>ℹ️ Importante:</strong> Esta planilha é compartilhada com toda a equipe. 
+                                Clique em "🔄 Atualizar" para ver as últimas alterações feitas por outros usuários.
+                            </p>
+                        </div>
+
+                        {/* Estatísticas */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            {Object.entries(estatisticas).map(([tipo, qtd]) => (
+                                <div key={tipo} className="bg-white rounded-lg shadow p-4">
+                                    <h3 className="text-lg font-semibold text-gray-700">{tipo}</h3>
+                                    <p className="text-3xl font-bold text-indigo-600">{qtd}</p>
+                                    <p className="text-sm text-gray-500">
+                                        Próximo: {String(qtd + 1).padStart(4, '0')}/{anoAtual}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Formulário de Cadastro */}
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <h2 className="text-xl font-bold text-gray-800 mb-4">Novo Documento</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Tipo de Documento
+                                    </label>
+                                    <select
+                                        value={novoDoc.tipo}
+                                        onChange={(e) => setNovoDoc({...novoDoc, tipo: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    >
+                                        <option value="EDITAL">EDITAL</option>
+                                        <option value="OFICIO">OFÍCIO</option>
+                                        <option value="MEMORANDO">MEMORANDO</option>
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Número: {String(obterProximoNumero(novoDoc.tipo)).padStart(4, '0')}/{anoAtual}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Data
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={novoDoc.data}
+                                        onChange={(e) => setNovoDoc({...novoDoc, data: e.target.value})}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Setor Origem *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={novoDoc.setorOrigem}
+                                        onChange={(e) => setNovoDoc({...novoDoc, setorOrigem: e.target.value})}
+                                        placeholder="Ex: Administração"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Setor Destino
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={novoDoc.setorDestino}
+                                        onChange={(e) => setNovoDoc({...novoDoc, setorDestino: e.target.value})}
+                                        placeholder="Ex: Recursos Humanos"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Observação
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={novoDoc.observacao}
+                                        onChange={(e) => setNovoDoc({...novoDoc, observacao: e.target.value})}
+                                        placeholder="Informações adicionais"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={adicionarDocumento}
+                                disabled={salvando}
+                                className="mt-4 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 font-medium disabled:bg-gray-400"
+                            >
+                                {salvando ? '⏳ Salvando...' : '➕ Adicionar Documento'}
+                            </button>
+                        </div>
+
+                        {/* Filtros */}
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium text-gray-700">🔍 Filtros:</span>
+                                </div>
+                                
+                                <select
+                                    value={filtroTipo}
+                                    onChange={(e) => setFiltroTipo(e.target.value)}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    <option value="TODOS">Todos os Tipos</option>
+                                    <option value="EDITAL">EDITAL</option>
+                                    <option value="OFICIO">OFÍCIO</option>
+                                    <option value="MEMORANDO">MEMORANDO</option>
+                                </select>
+
+                                <input
+                                    type="text"
+                                    value={filtroSetor}
+                                    onChange={(e) => setFiltroSetor(e.target.value)}
+                                    placeholder="Buscar por setor..."
+                                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                />
+
+                                <button
+                                    onClick={exportarParaCSV}
+                                    className="ml-auto bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+                                >
+                                    📥 Exportar CSV
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Tabela de Documentos */}
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-indigo-600 text-white">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left">Tipo</th>
+                                            <th className="px-4 py-3 text-left">Número</th>
+                                            <th className="px-4 py-3 text-left">Data</th>
+                                            <th className="px-4 py-3 text-left">Setor Origem</th>
+                                            <th className="px-4 py-3 text-left">Setor Destino</th>
+                                            <th className="px-4 py-3 text-left">Observação</th>
+                                            <th className="px-4 py-3 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {documentosFiltrados.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                                                    Nenhum documento cadastrado
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            documentosFiltrados.slice().reverse().map((doc, index) => (
+                                                <tr key={doc.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                                                    <td className="px-4 py-3">
+                                                        <span className="font-semibold text-indigo-600">{doc.tipo}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3 font-mono">{doc.numero}</td>
+                                                    <td className="px-4 py-3">
+                                                        {new Date(doc.data).toLocaleDateString('pt-BR')}
+                                                    </td>
+                                                    <td className="px-4 py-3">{doc.setorOrigem}</td>
+                                                    <td className="px-4 py-3">{doc.setorDestino || '-'}</td>
+                                                    <td className="px-4 py-3 text-sm text-gray-600">
+                                                        {doc.observacao || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => removerDocumento(doc.id)}
+                                                            className="text-red-600 hover:text-red-800 transition"
+                                                            title="Excluir"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 text-center text-sm text-gray-600">
+                            Total de documentos: {documentosFiltrados.length}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ControleNumeracao />, document.getElementById('root'));
+    </script>
+</body>
+</html>
