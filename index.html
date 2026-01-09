@@ -105,8 +105,8 @@
                                 <button
                                     onClick={() => setTab('doc')}
                                     className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${tab === 'doc'
-                                        ? 'bg-white text-indigo-600 shadow-lg'
-                                        : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
+                                            ? 'bg-white text-indigo-600 shadow-lg'
+                                            : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                                         }`}
                                 >
                                     📄 Documentos
@@ -114,8 +114,8 @@
                                 <button
                                     onClick={() => setTab('tax')}
                                     className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${tab === 'tax'
-                                        ? 'bg-white text-indigo-600 shadow-lg'
-                                        : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
+                                            ? 'bg-white text-indigo-600 shadow-lg'
+                                            : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
                                         }`}
                                 >
                                     💰 Contribuintes
@@ -442,216 +442,109 @@
                 MEMORANDO: docsFiltrados.filter(d => d.tipo === 'MEMORANDO').length
             };
 
-            if (loading) return (
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="animate-spin h-20 w-20 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                        <p className="text-gray-600 font-medium">Carregando documentos...</p>
-                    </div>
-                </div>
-            );
+            if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin h-16 w-16 border-4 border-blue-600 border-t-transparent rounded-full"></div></div>;
 
             return (
-                <div className="min-h-screen p-6">
+                <div className="min-h-screen bg-gray-50 p-4">
                     <div className="max-w-7xl mx-auto">
-                        {/* Header com Stats */}
-                        <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl p-8 mb-6 border border-white/20">
-                            <div className="flex items-center justify-between mb-8">
-                                <div>
-                                    <h2 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                                        📄 Controle de Numeração
-                                    </h2>
-                                    <p className="text-gray-600 font-medium">Ano de {year}</p>
-                                </div>
-                                <button
-                                    onClick={exportCSV}
-                                    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2"
-                                >
-                                    <span className="text-xl">📊</span>
-                                    Exportar CSV
-                                </button>
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold">📄 Controle de Numeração - {year}</h2>
+                                <button onClick={exportCSV} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">📊 Exportar CSV</button>
                             </div>
 
-                            {/* Filtros */}
-                            <div className="grid md:grid-cols-4 gap-4 mb-8">
-                                <select
-                                    value={filtros.tipo}
-                                    onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none bg-white font-medium"
-                                >
-                                    <option value="TODOS">📋 Todos os Tipos</option>
-                                    <option value="EDITAL">📢 EDITAL</option>
-                                    <option value="OFICIO">📝 OFÍCIO</option>
-                                    <option value="MEMORANDO">📄 MEMORANDO</option>
+                            <div className="grid md:grid-cols-4 gap-4 mb-6">
+                                <select value={filtros.tipo} onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })} className="px-3 py-2 border rounded-lg">
+                                    <option value="TODOS">Todos os Tipos</option>
+                                    <option value="EDITAL">EDITAL</option>
+                                    <option value="OFICIO">OFÍCIO</option>
+                                    <option value="MEMORANDO">MEMORANDO</option>
                                 </select>
-                                <input
-                                    type="text"
-                                    value={filtros.setor}
-                                    onChange={(e) => setFiltros({ ...filtros, setor: e.target.value })}
-                                    placeholder="🔍 Buscar por setor..."
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                />
-                                <input
-                                    type="date"
-                                    value={filtros.dataInicio}
-                                    onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                />
-                                <input
-                                    type="date"
-                                    value={filtros.dataFim}
-                                    onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                />
+                                <input type="text" value={filtros.setor} onChange={(e) => setFiltros({ ...filtros, setor: e.target.value })} placeholder="Buscar por setor..." className="px-3 py-2 border rounded-lg" />
+                                <input type="date" value={filtros.dataInicio} onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })} className="px-3 py-2 border rounded-lg" />
+                                <input type="date" value={filtros.dataFim} onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })} className="px-3 py-2 border rounded-lg" />
                             </div>
 
-                            {/* Stats Cards */}
                             <div className="grid md:grid-cols-4 gap-4">
-                                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">Total</div>
-                                    <div className="text-4xl font-bold text-white">{stats.total}</div>
+                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                                    <div className="text-sm text-blue-600 font-medium">Total</div>
+                                    <div className="text-3xl font-bold text-blue-700">{stats.total}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">EDITAL</div>
-                                    <div className="text-4xl font-bold text-white">{stats.EDITAL}</div>
+                                <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                                    <div className="text-sm text-green-600 font-medium">EDITAL</div>
+                                    <div className="text-3xl font-bold text-green-700">{stats.EDITAL}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">OFÍCIO</div>
-                                    <div className="text-4xl font-bold text-white">{stats.OFICIO}</div>
+                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                                    <div className="text-sm text-purple-600 font-medium">OFÍCIO</div>
+                                    <div className="text-3xl font-bold text-purple-700">{stats.OFICIO}</div>
                                 </div>
-                                <div className="bg-gradient-to-br from-orange-500 to-red-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">MEMORANDO</div>
-                                    <div className="text-4xl font-bold text-white">{stats.MEMORANDO}</div>
+                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+                                    <div className="text-sm text-orange-600 font-medium">MEMORANDO</div>
+                                    <div className="text-3xl font-bold text-orange-700">{stats.MEMORANDO}</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Formulário Novo Documento */}
-                        <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl p-8 mb-6 border border-white/20">
-                            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                                <span className="bg-gradient-to-r from-indigo-500 to-purple-500 p-2 rounded-xl text-white text-2xl">➕</span>
-                                Novo Documento
-                            </h3>
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <h3 className="text-xl font-bold mb-4">➕ Novo Documento</h3>
                             <div className="grid md:grid-cols-3 gap-4">
-                                <select
-                                    value={form.tipo}
-                                    onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none bg-white font-medium"
-                                >
+                                <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })} className="px-3 py-2 border rounded-lg">
                                     <option>EDITAL</option>
                                     <option>OFICIO</option>
                                     <option>MEMORANDO</option>
                                 </select>
-                                <input
-                                    type="date"
-                                    value={form.data}
-                                    onChange={(e) => setForm({ ...form, data: e.target.value })}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                />
-                                <input
-                                    type="text"
-                                    value={form.setorOrigem}
-                                    onChange={(e) => setForm({ ...form, setorOrigem: e.target.value })}
-                                    placeholder="Setor Origem *"
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                />
-                                <input
-                                    type="text"
-                                    value={form.setorDestino}
-                                    onChange={(e) => setForm({ ...form, setorDestino: e.target.value })}
-                                    placeholder="Setor Destino"
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none"
-                                />
-                                <input
-                                    type="text"
-                                    value={form.obs}
-                                    onChange={(e) => setForm({ ...form, obs: e.target.value })}
-                                    placeholder="Observação"
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none md:col-span-2"
-                                />
+                                <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} className="px-3 py-2 border rounded-lg" />
+                                <input type="text" value={form.setorOrigem} onChange={(e) => setForm({ ...form, setorOrigem: e.target.value })} placeholder="Setor Origem *" className="px-3 py-2 border rounded-lg" />
+                                <input type="text" value={form.setorDestino} onChange={(e) => setForm({ ...form, setorDestino: e.target.value })} placeholder="Setor Destino" className="px-3 py-2 border rounded-lg" />
+                                <input type="text" value={form.obs} onChange={(e) => setForm({ ...form, obs: e.target.value })} placeholder="Observação" className="px-3 py-2 border rounded-lg md:col-span-2" />
                             </div>
-                            <button
-                                onClick={add}
-                                className="mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2"
-                            >
-                                <span className="text-xl">➕</span>
-                                Adicionar Documento
-                            </button>
+                            <button onClick={add} className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">➕ Adicionar</button>
                         </div>
 
-                        {/* Tabela de Documentos */}
-                        <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl overflow-hidden border border-white/20">
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="w-full">
-                                    <thead className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white">
+                                    <thead className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                                         <tr>
-                                            <th className="px-6 py-4 text-left font-bold">Tipo</th>
-                                            <th className="px-6 py-4 text-left font-bold">Número</th>
-                                            <th className="px-6 py-4 text-left font-bold">Data</th>
-                                            <th className="px-6 py-4 text-left font-bold">Origem</th>
-                                            <th className="px-6 py-4 text-left font-bold">Destino</th>
-                                            <th className="px-6 py-4 text-left font-bold">Observação</th>
-                                            <th className="px-6 py-4 text-center font-bold">Ações</th>
+                                            <th className="px-4 py-3 text-left">Tipo</th>
+                                            <th className="px-4 py-3 text-left">Número</th>
+                                            <th className="px-4 py-3 text-left">Data</th>
+                                            <th className="px-4 py-3 text-left">Origem</th>
+                                            <th className="px-4 py-3 text-left">Destino</th>
+                                            <th className="px-4 py-3 text-left">Observação</th>
+                                            <th className="px-4 py-3 text-center">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {docsFiltrados.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="7" className="px-6 py-12 text-center text-gray-500 font-medium">
-                                                    <div className="flex flex-col items-center gap-3">
-                                                        <span className="text-6xl opacity-20">📄</span>
-                                                        <span>Nenhum documento encontrado</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                            <tr><td colSpan="7" className="px-4 py-8 text-center text-gray-500">Nenhum documento encontrado</td></tr>
                                         ) : (
                                             docsFiltrados.slice().reverse().map((d, i) => (
-                                                <tr key={d.id} className={`border-t border-gray-200 hover:bg-indigo-50/50 transition-colors ${i % 2 === 0 ? 'bg-white/50' : 'bg-gray-50/50'}`}>
+                                                <tr key={d.id} className={i % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                                                     {editando?.id === d.id ? (
                                                         <>
-                                                            <td className="px-6 py-4">
-                                                                <select value={editando.tipo} onChange={(e) => setEditando({ ...editando, tipo: e.target.value })} className="px-3 py-2 border-2 border-indigo-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-indigo-500">
-                                                                    <option>EDITAL</option>
-                                                                    <option>OFICIO</option>
-                                                                    <option>MEMORANDO</option>
-                                                                </select>
-                                                            </td>
-                                                            <td className="px-6 py-4 font-mono font-semibold">{d.numero}</td>
-                                                            <td className="px-6 py-4">
-                                                                <input type="date" value={editando.data} onChange={(e) => setEditando({ ...editando, data: e.target.value })} className="px-3 py-2 border-2 border-indigo-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-indigo-500" />
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <input type="text" value={editando.setorOrigem} onChange={(e) => setEditando({ ...editando, setorOrigem: e.target.value })} className="px-3 py-2 border-2 border-indigo-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-indigo-500" />
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <input type="text" value={editando.setorDestino || ''} onChange={(e) => setEditando({ ...editando, setorDestino: e.target.value })} className="px-3 py-2 border-2 border-indigo-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-indigo-500" />
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <input type="text" value={editando.obs || ''} onChange={(e) => setEditando({ ...editando, obs: e.target.value })} className="px-3 py-2 border-2 border-indigo-300 rounded-lg w-full outline-none focus:ring-2 focus:ring-indigo-500" />
-                                                            </td>
-                                                            <td className="px-6 py-4 text-center">
-                                                                <button onClick={() => update(d.id)} className="text-green-600 hover:text-green-800 mr-3 text-2xl transition-transform hover:scale-125">✓</button>
-                                                                <button onClick={() => setEditando(null)} className="text-gray-600 hover:text-gray-800 text-2xl transition-transform hover:scale-125">✗</button>
+                                                            <td className="px-4 py-3"><select value={editando.tipo} onChange={(e) => setEditando({ ...editando, tipo: e.target.value })} className="px-2 py-1 border rounded w-full"><option>EDITAL</option><option>OFICIO</option><option>MEMORANDO</option></select></td>
+                                                            <td className="px-4 py-3 font-mono">{d.numero}</td>
+                                                            <td className="px-4 py-3"><input type="date" value={editando.data} onChange={(e) => setEditando({ ...editando, data: e.target.value })} className="px-2 py-1 border rounded w-full" /></td>
+                                                            <td className="px-4 py-3"><input type="text" value={editando.setorOrigem} onChange={(e) => setEditando({ ...editando, setorOrigem: e.target.value })} className="px-2 py-1 border rounded w-full" /></td>
+                                                            <td className="px-4 py-3"><input type="text" value={editando.setorDestino || ''} onChange={(e) => setEditando({ ...editando, setorDestino: e.target.value })} className="px-2 py-1 border rounded w-full" /></td>
+                                                            <td className="px-4 py-3"><input type="text" value={editando.obs || ''} onChange={(e) => setEditando({ ...editando, obs: e.target.value })} className="px-2 py-1 border rounded w-full" /></td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <button onClick={() => update(d.id)} className="text-green-600 hover:text-green-800 mr-2 text-xl">✓</button>
+                                                                <button onClick={() => setEditando(null)} className="text-gray-600 hover:text-gray-800 text-xl">✗</button>
                                                             </td>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <td className="px-6 py-4">
-                                                                <span className={`px-3 py-1 rounded-lg font-bold text-sm ${d.tipo === 'EDITAL' ? 'bg-green-100 text-green-700' :
-                                                                    d.tipo === 'OFICIO' ? 'bg-purple-100 text-purple-700' :
-                                                                        'bg-orange-100 text-orange-700'
-                                                                    }`}>
-                                                                    {d.tipo}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-6 py-4 font-mono font-bold text-indigo-600">{d.numero}</td>
-                                                            <td className="px-6 py-4 text-gray-700">{formatDate(d.data)}</td>
-                                                            <td className="px-6 py-4 text-gray-700 font-medium">{d.setorOrigem}</td>
-                                                            <td className="px-6 py-4 text-gray-600">{d.setorDestino || '-'}</td>
-                                                            <td className="px-6 py-4 text-gray-600 text-sm">{d.obs || '-'}</td>
-                                                            <td className="px-6 py-4 text-center">
-                                                                <button onClick={() => setEditando(d)} className="text-blue-600 hover:text-blue-800 mr-3 text-xl transition-transform hover:scale-125">✏️</button>
-                                                                <button onClick={() => del(d.id)} className="text-red-600 hover:text-red-800 text-xl transition-transform hover:scale-125">🗑️</button>
+                                                            <td className="px-4 py-3 font-semibold text-blue-600">{d.tipo}</td>
+                                                            <td className="px-4 py-3 font-mono">{d.numero}</td>
+                                                            <td className="px-4 py-3">{formatDate(d.data)}</td>
+                                                            <td className="px-4 py-3">{d.setorOrigem}</td>
+                                                            <td className="px-4 py-3">{d.setorDestino || '-'}</td>
+                                                            <td className="px-4 py-3 text-sm">{d.obs || '-'}</td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <button onClick={() => setEditando(d)} className="text-blue-600 hover:text-blue-800 mr-2">✏️</button>
+                                                                <button onClick={() => del(d.id)} className="text-red-600 hover:text-red-800">🗑️</button>
                                                             </td>
                                                         </>
                                                     )}
@@ -1034,206 +927,138 @@
             const dashboard = calcDashboard();
 
             return (
-                <div className="min-h-screen p-6">
-                    <div className="max-w-full">
-                        {/* Header */}
-                        <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl p-8 mb-6 border border-white/20">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-2xl">
-                                    <span className="text-4xl">💰</span>
-                                </div>
-                                <div>
-                                    <h2 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                                        Lançamento de Taxas
-                                    </h2>
-                                    <p className="text-gray-600 font-medium">Gestão de Contribuintes</p>
-                                </div>
+                <div className="min-h-screen bg-gray-50 p-6">
+                    <div className="mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="text-3xl">💰</span>
+                            <h2 className="text-2xl font-bold">Lançamento de Taxas</h2>
+                        </div>
+
+                        <div className="flex gap-4 mb-4 flex-wrap">
+                            <select value={modoVisualizacao} onChange={e => setModoVisualizacao(e.target.value)} className="px-4 py-2 border rounded bg-white">
+                                <option value="mensal">📅 Mensal</option>
+                                <option value="anual">📊 Consolidado Anual</option>
+                                <option value="periodo">📆 Por Período</option>
+                            </select>
+
+                            {modoVisualizacao === 'mensal' && (
+                                <>
+                                    <select value={mes} onChange={e => setMes(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                        {MESES.map((m, i) => (
+                                            <option key={i} value={i}>{m}</option>
+                                        ))}
+                                    </select>
+                                </>
+                            )}
+
+                            {modoVisualizacao === 'periodo' && (
+                                <>
+                                    <select value={periodoInicio} onChange={e => setPeriodoInicio(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                        {MESES.map((m, i) => (
+                                            <option key={i} value={i}>{m}</option>
+                                        ))}
+                                    </select>
+                                    <span className="flex items-center">até</span>
+                                    <select value={periodoFim} onChange={e => setPeriodoFim(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                        {MESES.map((m, i) => (
+                                            <option key={i} value={i}>{m}</option>
+                                        ))}
+                                    </select>
+                                </>
+                            )}
+
+                            <select value={ano} onChange={e => setAno(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                {[2026, 2027, 2028, 2029, 2030].map(a => (
+                                    <option key={a} value={a}>{a}</option>
+                                ))}
+                            </select>
+
+                            <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded border border-blue-200">
+                                {modoVisualizacao === 'mensal' && `📅 ${MESES[mes]}/${ano}`}
+                                {modoVisualizacao === 'anual' && `📊 Ano ${ano}`}
+                                {modoVisualizacao === 'periodo' && `📆 ${MESES[periodoInicio]} - ${MESES[periodoFim]}/${ano}`}
                             </div>
 
-                            {/* Filtros de Visualização */}
-                            <div className="flex gap-4 mb-6 flex-wrap">
-                                <select
-                                    value={modoVisualizacao}
-                                    onChange={e => setModoVisualizacao(e.target.value)}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none bg-white font-medium"
-                                >
-                                    <option value="mensal">📅 Mensal</option>
-                                    <option value="anual">📊 Consolidado Anual</option>
-                                    <option value="periodo">📆 Por Período</option>
-                                </select>
-
-                                {modoVisualizacao === 'mensal' && (
-                                    <>
-                                        <select
-                                            value={mes}
-                                            onChange={e => setMes(Number(e.target.value))}
-                                            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none bg-white font-medium"
-                                        >
-                                            {MESES.map((m, i) => (
-                                                <option key={i} value={i}>{m}</option>
-                                            ))}
-                                        </select>
-                                    </>
-                                )}
-
-                                {modoVisualizacao === 'periodo' && (
-                                    <>
-                                        <select
-                                            value={periodoInicio}
-                                            onChange={e => setPeriodoInicio(Number(e.target.value))}
-                                            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none bg-white font-medium"
-                                        >
-                                            {MESES.map((m, i) => (
-                                                <option key={i} value={i}>{m}</option>
-                                            ))}
-                                        </select>
-                                        <span className="flex items-center font-medium text-gray-600">até</span>
-                                        <select
-                                            value={periodoFim}
-                                            onChange={e => setPeriodoFim(Number(e.target.value))}
-                                            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none bg-white font-medium"
-                                        >
-                                            {MESES.map((m, i) => (
-                                                <option key={i} value={i}>{m}</option>
-                                            ))}
-                                        </select>
-                                    </>
-                                )}
-
-                                <select
-                                    value={ano}
-                                    onChange={e => setAno(Number(e.target.value))}
-                                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-green-500/20 focus:border-green-500 transition-all outline-none bg-white font-medium"
-                                >
-                                    {[2026, 2027, 2028, 2029, 2030].map(a => (
-                                        <option key={a} value={a}>{a}</option>
-                                    ))}
-                                </select>
-
-                                <div className="px-5 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 rounded-xl border-2 border-blue-200 font-semibold">
-                                    {modoVisualizacao === 'mensal' && `📅 ${MESES[mes]}/${ano}`}
-                                    {modoVisualizacao === 'anual' && `📊 Ano ${ano}`}
-                                    {modoVisualizacao === 'periodo' && `📆 ${MESES[periodoInicio]} - ${MESES[periodoFim]}/${ano}`}
+                            {ano >= 2027 ? (
+                                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded px-3 py-2">
+                                    <label className="text-sm text-green-700 font-medium">💵 UFICA {ano}:</label>
+                                    <input type="number" step="0.01" value={valorUfica[ano] || ''} onChange={e => setValorUfica({ ...valorUfica, [ano]: parseFloat(e.target.value) || 0 })} className="px-3 py-1 border rounded w-32 text-sm" placeholder="0.00" />
                                 </div>
+                            ) : (
+                                <div className="px-4 py-2 bg-green-50 text-green-700 rounded border border-green-200 text-sm">
+                                    💵 UFICA {ano}: R$ {formatarMoeda(valorUficaAtual)}
+                                </div>
+                            )}
+                        </div>
 
-                                {ano >= 2027 ? (
-                                    <div className="flex items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl px-4 py-3">
-                                        <label className="text-sm text-green-700 font-semibold">💵 UFICA {ano}:</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={valorUfica[ano] || ''}
-                                            onChange={e => setValorUfica({ ...valorUfica, [ano]: parseFloat(e.target.value) || 0 })}
-                                            className="px-3 py-2 border-2 border-green-300 rounded-lg w-32 text-sm font-medium outline-none focus:ring-2 focus:ring-green-500"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="px-5 py-3 bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 rounded-xl border-2 border-green-200 font-semibold">
-                                        💵 UFICA {ano}: R$ {formatarMoeda(valorUficaAtual)}
-                                    </div>
-                                )}
+                        <div className="grid grid-cols-7 gap-4 mb-6">
+                            <div className="bg-white rounded-lg p-4 border">
+                                <div className="text-sm text-gray-600 mb-1">Total</div>
+                                <div className="text-3xl font-bold text-gray-800">{dashboard.total}</div>
                             </div>
 
-                            {/* Stats Cards */}
-                            <div className="grid grid-cols-7 gap-4">
-                                <div className="bg-gradient-to-br from-gray-500 to-gray-700 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">Total</div>
-                                    <div className="text-4xl font-bold text-white">{dashboard.total}</div>
-                                </div>
+                            <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                                <div className="text-sm text-gray-600 mb-1">Pendentes</div>
+                                <div className="text-3xl font-bold text-yellow-600">{dashboard.pendentes}</div>
+                            </div>
 
-                                <div className="bg-gradient-to-br from-yellow-500 to-orange-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">Pendentes</div>
-                                    <div className="text-4xl font-bold text-white">{dashboard.pendentes}</div>
-                                </div>
+                            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                                <div className="text-sm text-gray-600 mb-1">✅ Verificados</div>
+                                <div className="text-3xl font-bold text-green-600">{dashboard.verificados}</div>
+                            </div>
 
-                                <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">✅ Verificados</div>
-                                    <div className="text-4xl font-bold text-white">{dashboard.verificados}</div>
-                                </div>
+                            <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                                <div className="text-sm text-gray-600 mb-1">⚠️ Duplicados</div>
+                                <div className="text-3xl font-bold text-orange-600">{dashboard.totalDuplicados}</div>
+                            </div>
 
-                                <div className="bg-gradient-to-br from-orange-500 to-red-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">⚠️ Duplicados</div>
-                                    <div className="text-4xl font-bold text-white">{dashboard.totalDuplicados}</div>
-                                </div>
+                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                <div className="text-sm text-gray-600 mb-1">Total TFLF</div>
+                                <div className="text-3xl font-bold text-blue-600">R$ {formatarMoeda(dashboard.totalReais)}</div>
+                            </div>
 
-                                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">Total TFLF</div>
-                                    <div className="text-2xl font-bold text-white">R$ {formatarMoeda(dashboard.totalReais)}</div>
-                                </div>
+                            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                                <div className="text-sm text-gray-600 mb-1">Total ISSQN</div>
+                                <div className="text-3xl font-bold text-indigo-600">R$ {formatarMoeda(dashboard.totalISSQN)}</div>
+                            </div>
 
-                                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">Total ISSQN</div>
-                                    <div className="text-2xl font-bold text-white">R$ {formatarMoeda(dashboard.totalISSQN)}</div>
-                                </div>
-
-                                <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-6 rounded-2xl shadow-lg transform transition-all duration-300 hover:scale-105">
-                                    <div className="text-white/80 text-sm font-semibold mb-2">Vigilância</div>
-                                    <div className="text-2xl font-bold text-white">R$ {formatarMoeda(dashboard.vigilancia)}</div>
-                                </div>
+                            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                                <div className="text-sm text-gray-600 mb-1">Vigilância</div>
+                                <div className="text-3xl font-bold text-purple-600">R$ {formatarMoeda(dashboard.vigilancia)}</div>
                             </div>
                         </div>
 
-                        {/* Abas e Ações */}
-                        <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl p-6 mb-6 border border-white/20">
-                            <div className="flex gap-3 mb-6 border-b-2 border-gray-200 pb-2">
-                                <button
-                                    onClick={() => setAbaAtiva('principal')}
-                                    className={`px-6 py-3 font-bold rounded-t-xl transition-all ${abaAtiva === 'principal'
-                                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                >
+                        <div className="bg-white rounded-lg shadow p-4 mb-6">
+                            <div className="flex gap-2 mb-4 border-b">
+                                <button onClick={() => setAbaAtiva('principal')} className={`px-4 py-2 font-medium ${abaAtiva === 'principal' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}>
                                     📋 Principal ({list.length})
                                 </button>
-                                <button
-                                    onClick={() => setAbaAtiva('duplicados')}
-                                    className={`px-6 py-3 font-bold rounded-t-xl transition-all ${abaAtiva === 'duplicados'
-                                            ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white shadow-lg'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                >
+                                <button onClick={() => setAbaAtiva('duplicados')} className={`px-4 py-2 font-medium ${abaAtiva === 'duplicados' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-600'}`}>
                                     ⚠️ Duplicidade ({dashboard.totalDuplicados})
                                 </button>
                             </div>
 
-                            <div className="flex flex-wrap gap-3">
-                                <button
-                                    onClick={() => setModalInserir(true)}
-                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2"
-                                >
-                                    <span className="text-xl">➕</span>
-                                    Inserir
+                            <div className="flex flex-wrap gap-4">
+                                <button onClick={() => setModalInserir(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    ➕ Inserir
                                 </button>
 
-                                <label className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer flex items-center gap-2">
-                                    <span className="text-xl">📁</span>
-                                    Importar TXT
+                                <label className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded cursor-pointer hover:bg-indigo-700">
+                                    <span>📁 Importar TXT</span>
                                     <input type="file" accept=".txt" onChange={e => importarTXT(e.target.files[0])} className="hidden" />
                                 </label>
 
-                                <button
-                                    onClick={consultarTodos}
-                                    className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl hover:from-purple-700 hover:to-pink-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                    disabled={consultandoQueue.length > 0}
-                                >
-                                    <span className="text-xl">{consultandoQueue.length > 0 ? '🔄' : '🔍'}</span>
-                                    {consultandoQueue.length > 0 ? 'Consultando...' : 'Consultar CNPJs'}
+                                <button onClick={consultarTodos} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={consultandoQueue.length > 0}>
+                                    {consultandoQueue.length > 0 ? '🔄 Consultando...' : '🔍 Consultar CNPJs'}
                                 </button>
 
-                                <button
-                                    onClick={exportCSV}
-                                    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2"
-                                >
-                                    <span className="text-xl">📊</span>
-                                    Exportar CSV
+                                <button onClick={exportCSV} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                    📊 Exportar CSV
                                 </button>
                             </div>
                         </div>
 
-                        {/* Tabela de Contribuintes */}
-                        <div className="backdrop-blur-xl bg-white/80 rounded-3xl shadow-2xl overflow-hidden border border-white/20"
-                        >>
+                        <div className="bg-white rounded-lg shadow overflow-hidden">
                             {modalInserir && (
                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                                     <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
