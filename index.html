@@ -1,7 +1,5 @@
 <!DOCTYPE html>
-        
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,7 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
-
 <body>
     <div id="root"></div>
     <script type="text/babel">
@@ -33,8 +30,77 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const CNAES_VISA = ['4711', '4712', '4721', '4722', '4723', '4724', '4729', '5611', '5612', '5620', '8610', '8621', '8622', '8630', '8640', '8650', '1011', '1012', '1013', '1020', '1031', '1032', '1033', '4631', '4632', '4633', '4634', '4635', '4636', '4637', '4639', '1051', '1052', '1053', '1061', '1062', '1063', '1064', '1065', '1066', '1069', '1071', '1072', '4781', '4782', '4783', '4784', '4785', '4789', '8711', '8712', '8720', '8730', '8800', '4771', '4772', '4773', '4774'];
-        const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        const CNAES_VISA = [
+  '0111', '0112', '0113', '0114', '0115', '0116', '0119', '0121', '0122', '0131',
+  '0132', '0133', '0134', '0135', '0139', '0141', '0142', '0151', '0152', '0153',
+  '0154', '0155', '0159', '0161', '0162', '0163', '0170', '0210', '0220', '0230',
+  '0311', '0312', '0321', '0322', '0500', '0600', '0710', '0721', '0722', '0723',
+  '0724', '0725', '0729', '0810', '0891', '0892', '0893', '0899', '0910', '0990',
+  '1011', '1012', '1013', '1020', '1031', '1032', '1033', '1041', '1042', '1043',
+  '1051', '1052', '1053', '1061', '1062', '1063', '1064', '1065', '1066', '1069',
+  '1071', '1072', '1081', '1082', '1091', '1092', '1093', '1094', '1095', '1096',
+  '1099', '1111', '1112', '1113', '1121', '1122', '1210', '1220', '1311', '1312',
+  '1313', '1314', '1321', '1322', '1323', '1330', '1340', '1351', '1352', '1353',
+  '1354', '1359', '1411', '1412', '1413', '1414', '1421', '1422', '1510', '1521',
+  '1529', '1531', '1532', '1533', '1539', '1540', '1610', '1621', '1622', '1623',
+  '1629', '1710', '1721', '1722', '1731', '1732', '1733', '1741', '1742', '1749',
+  '1811', '1812', '1813', '1821', '1822', '1830', '1910', '1921', '1922', '1931',
+  '1932', '2011', '2012', '2013', '2014', '2019', '2021', '2022', '2029', '2031',
+  '2032', '2033', '2040', '2051', '2052', '2061', '2062', '2063', '2071', '2072',
+  '2073', '2091', '2092', '2093', '2094', '2099', '2110', '2121', '2122', '2123',
+  '2211', '2212', '2219', '2221', '2222', '2223', '2229', '2311', '2312', '2319',
+  '2320', '2330', '2341', '2342', '2349', '2391', '2392', '2399', '2411', '2412',
+  '2421', '2422', '2423', '2424', '2431', '2439', '2441', '2442', '2443', '2449',
+  '2451', '2452', '2511', '2512', '2513', '2521', '2522', '2531', '2532', '2539',
+  '2541', '2542', '2543', '2550', '2591', '2592', '2593', '2599', '2610', '2621',
+  '2622', '2631', '2632', '2640', '2651', '2652', '2660', '2670', '2680', '2710',
+  '2721', '2722', '2731', '2732', '2733', '2740', '2751', '2759', '2790', '2811',
+  '2812', '2813', '2814', '2815', '2821', '2822', '2823', '2824', '2825', '2829',
+  '2831', '2832', '2833', '2840', '2851', '2852', '2853', '2854', '2861', '2862',
+  '2863', '2864', '2865', '2866', '2869', '2910', '2920', '2930', '2941', '2942',
+  '2943', '2944', '2945', '2949', '2950', '3011', '3012', '3031', '3032', '3041',
+  '3042', '3050', '3091', '3092', '3099', '3101', '3102', '3103', '3104', '3211',
+  '3212', '3220', '3230', '3240', '3250', '3291', '3292', '3299', '3311', '3312',
+  '3313', '3314', '3315', '3316', '3317', '3319', '3321', '3329', '3511', '3512',
+  '3513', '3514', '3520', '3530', '3600', '3701', '3702', '3811', '3812', '3821',
+  '3822', '3831', '3832', '3839', '3900', '4110', '4120', '4211', '4212', '4213',
+  '4221', '4222', '4223', '4291', '4292', '4299', '4311', '4312', '4313', '4319',
+  '4321', '4322', '4329', '4330', '4391', '4399', '4511', '4512', '4520', '4530',
+  '4541', '4542', '4543', '4611', '4612', '4613', '4614', '4615', '4616', '4617',
+  '4618', '4619', '4621', '4622', '4623', '4631', '4632', '4633', '4634', '4635',
+  '4636', '4637', '4639', '4641', '4642', '4643', '4644', '4645', '4646', '4647',
+  '4649', '4651', '4652', '4661', '4662', '4663', '4664', '4665', '4669', '4671',
+  '4672', '4673', '4674', '4679', '4681', '4682', '4683', '4684', '4685', '4686',
+  '4687', '4689', '4691', '4692', '4693', '4711', '4712', '4713', '4721', '4722',
+  '4723', '4724', '4729', '4731', '4732', '4741', '4742', '4743', '4744', '4751',
+  '4752', '4753', '4754', '4755', '4756', '4757', '4759', '4761', '4762', '4763',
+  '4771', '4772', '4773', '4774', '4781', '4782', '4783', '4784', '4785', '4789',
+  '4911', '4912', '4921', '4922', '4923', '4924', '4929', '4930', '4940', '4950',
+  '5011', '5012', '5021', '5022', '5030', '5091', '5099', '5111', '5112', '5120',
+  '5130', '5211', '5212', '5221', '5222', '5223', '5229', '5231', '5232', '5239',
+  '5240', '5250', '5310', '5320', '5510', '5590', '5611', '5612', '5620', '5811',
+  '5812', '5813', '5819', '5821', '5822', '5823', '5829', '5911', '5912', '5913',
+  '5914', '5920', '6010', '6021', '6022', '6110', '6120', '6130', '6141', '6142',
+  '6143', '6190', '6201', '6202', '6203', '6204', '6209', '6311', '6319', '6391',
+  '6399', '6410', '6421', '6422', '6423', '6424', '6431', '6432', '6433', '6434',
+  '6435', '6436', '6437', '6438', '6440', '6450', '6461', '6462', '6463', '6470',
+  '6491', '6492', '6493', '6499', '6511', '6512', '6520', '6530', '6541', '6542',
+  '6550', '6611', '6612', '6613', '6619', '6621', '6622', '6629', '6630', '6810',
+  '6821', '6822', '6911', '6912', '6920', '7020', '7111', '7112', '7119', '7120',
+  '7210', '7220', '7311', '7312', '7319', '7320', '7410', '7420', '7490', '7500',
+  '7711', '7719', '7721', '7722', '7723', '7729', '7731', '7732', '7733', '7739',
+  '7740', '7810', '7820', '7830', '7911', '7912', '7990', '8011', '8012', '8020',
+  '8030', '8111', '8112', '8121', '8122', '8129', '8130', '8211', '8219', '8220',
+  '8230', '8291', '8292', '8299', '8411', '8412', '8413', '8421', '8422', '8423',
+  '8424', '8425', '8430', '8511', '8512', '8513', '8520', '8531', '8532', '8533',
+  '8541', '8542', '8550', '8591', '8592', '8593', '8599', '8610', '8621', '8622',
+  '8630', '8640', '8650', '8660', '8690', '8711', '8712', '8720', '8730', '8800',
+  '9001', '9002', '9003', '9101', '9102', '9103', '9200', '9311', '9312', '9313',
+  '9319', '9321', '9329', '9411', '9412', '9420', '9430', '9491', '9492', '9493',
+  '9499', '9511', '9512', '9521', '9529', '9601', '9602', '9603', '9609', '9700',
+  '9900'
+];
+		const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
         const AUDITORES = ['Adel A.', 'Alessandro N.', 'Aline P.', 'Amanda V.', 'Carolina S.', 'Erick J.', 'Fagne A.', 'Gabriel S.', 'Igor B.', 'Jennipher A.', 'Matheus C.', 'Nahttura P.', 'Natalia C.', 'Natalia G.', 'Pedro A.', 'Raphael O.', 'Rodrigo R.', 'Thiago S.', 'Tiago M.'];
         const VALOR_UFICA_2026 = 179.50;
 
@@ -59,7 +125,6 @@
             const [tab, setTab] = useState('doc');
             const [valorUfica, setValorUfica] = useState({ 2026: 179.50, 2027: 0, 2028: 0, 2029: 0, 2030: 0 });
 
-            // Verificar estado de autenticação ao carregar
             useEffect(() => {
                 const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
                     setAuth(!!user);
@@ -96,7 +161,7 @@
                             <h1 className="text-white font-bold text-xl">💻 PAWG – Portal de Administração e Workflow de Guias</h1>
                             <div className="flex gap-4">
                                 <button onClick={() => setTab('doc')} className={`px-4 py-2 rounded-lg font-medium ${tab === 'doc' ? 'bg-white text-blue-600' : 'text-white hover:bg-blue-500'}`}>📄 Documentos</button>
-                                <button onClick={() => setTab('tax')} className={`px-4 py-2 rounded-lg font-medium ${tab === 'tax' ? 'bg-white text-blue-600' : 'text-white hover:bg-blue-500'}`}>💁 Contribuintes</button>
+                                <button onClick={() => setTab('tax')} className={`px-4 py-2 rounded-lg font-medium ${tab === 'tax' ? 'bg-white text-blue-600' : 'text-white hover:bg-blue-500'}`}>💰 Contribuintes</button>
                                 <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 font-medium">🚪 Sair</button>
                             </div>
                         </div>
@@ -128,25 +193,15 @@
                 setE('');
 
                 try {
-                    // Autenticação real com Firebase
                     await firebase.auth().signInWithEmailAndPassword(u, p);
                     onLogin();
                 } catch (error) {
                     console.error('Erro de autenticação:', error);
-
-                    // Mensagens de erro amigáveis
-                    if (error.code === 'auth/user-not-found') {
-                        setE('❌ Usuário não encontrado');
-                    } else if (error.code === 'auth/wrong-password') {
-                        setE('❌ Senha incorreta');
-                    } else if (error.code === 'auth/invalid-email') {
-                        setE('❌ Email inválido');
-                    } else if (error.code === 'auth/too-many-requests') {
-                        setE('❌ Muitas tentativas. Aguarde alguns minutos');
-                    } else {
-                        setE('❌ Erro ao fazer login. Verifique suas credenciais');
-                    }
-
+                    if (error.code === 'auth/user-not-found') setE('❌ Usuário não encontrado');
+                    else if (error.code === 'auth/wrong-password') setE('❌ Senha incorreta');
+                    else if (error.code === 'auth/invalid-email') setE('❌ Email inválido');
+                    else if (error.code === 'auth/too-many-requests') setE('❌ Muitas tentativas. Aguarde alguns minutos');
+                    else setE('❌ Erro ao fazer login. Verifique suas credenciais');
                     setP('');
                 } finally {
                     setLoading(false);
@@ -155,7 +210,6 @@
 
             return (
                 <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
-                    {/* Background animado com gradiente */}
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-700">
                         <div className="absolute inset-0 opacity-30">
                             <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
@@ -164,7 +218,6 @@
                         </div>
                     </div>
 
-                    {/* Partículas flutuantes */}
                     <div className="absolute inset-0 overflow-hidden pointer-events-none">
                         <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white rounded-full opacity-20 animate-float"></div>
                         <div className="absolute top-1/3 right-1/4 w-3 h-3 bg-white rounded-full opacity-30 animate-float animation-delay-1000"></div>
@@ -172,10 +225,8 @@
                         <div className="absolute top-2/3 right-1/3 w-2 h-2 bg-white rounded-full opacity-20 animate-float animation-delay-3000"></div>
                     </div>
 
-                    {/* Card de Login com Glassmorphism */}
                     <div className="relative z-10 w-full max-w-md">
                         <div className="backdrop-blur-xl bg-white/90 rounded-3xl shadow-2xl p-10 border border-white/20 transform transition-all duration-300 hover:scale-[1.02]">
-                            {/* Header com ícone animado */}
                             <div className="text-center mb-8">
                                 <div className="relative inline-block mb-6">
                                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full blur-lg opacity-50 animate-pulse"></div>
@@ -193,55 +244,43 @@
                                 </div>
                             </div>
 
-                            {/* Formulário */}
                             <form onSubmit={handleSubmit} className="space-y-5">
-                                {/* Campo Email */}
                                 <div className="group">
                                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                        <span className="text-lg">📧</span>
-                                        Email
+                                        <span className="text-lg">📧</span> Email
                                     </label>
-                                    <div className="relative">
-                                        <input
-                                            type="email"
-                                            value={u}
-                                            onChange={(ev) => setU(ev.target.value)}
-                                            placeholder="seu.email@exemplo.com"
-                                            className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-300 outline-none disabled:opacity-50 disabled:cursor-not-allowed group-hover:border-indigo-300"
-                                            required
-                                            disabled={loading}
-                                        />
-                                    </div>
+                                    <input
+                                        type="email"
+                                        value={u}
+                                        onChange={(ev) => setU(ev.target.value)}
+                                        placeholder="seu.email@exemplo.com"
+                                        className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-300 outline-none disabled:opacity-50 disabled:cursor-not-allowed group-hover:border-indigo-300"
+                                        required
+                                        disabled={loading}
+                                    />
                                 </div>
 
-                                {/* Campo Senha */}
                                 <div className="group">
                                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                        <span className="text-lg">🔑</span>
-                                        Senha
+                                        <span className="text-lg">🔑</span> Senha
                                     </label>
-                                    <div className="relative">
-                                        <input
-                                            type="password"
-                                            value={p}
-                                            onChange={(ev) => setP(ev.target.value)}
-                                            placeholder="••••••••"
-                                            className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-300 outline-none disabled:opacity-50 disabled:cursor-not-allowed group-hover:border-indigo-300"
-                                            required
-                                            disabled={loading}
-                                        />
-                                    </div>
+                                    <input
+                                        type="password"
+                                        value={p}
+                                        onChange={(ev) => setP(ev.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full px-5 py-4 bg-white border-2 border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all duration-300 outline-none disabled:opacity-50 disabled:cursor-not-allowed group-hover:border-indigo-300"
+                                        required
+                                        disabled={loading}
+                                    />
                                 </div>
 
-                                {/* Mensagem de Erro */}
                                 {e && (
                                     <div className="bg-red-50 border-2 border-red-200 text-red-700 px-5 py-4 rounded-xl text-sm font-medium flex items-center gap-3 animate-shake">
-                                        <span className="text-xl">⚠️</span>
-                                        <span>{e}</span>
+                                        <span className="text-xl">⚠️</span> <span>{e}</span>
                                     </div>
                                 )}
 
-                                {/* Botão de Login */}
                                 <button
                                     type="submit"
                                     className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl hover:from-indigo-700 hover:to-purple-700 font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0"
@@ -264,7 +303,6 @@
                                 </button>
                             </form>
 
-                            {/* Footer */}
                             <div className="mt-8 pt-6 border-t border-gray-200">
                                 <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                                     <span className="text-lg">🔒</span>
@@ -273,7 +311,6 @@
                             </div>
                         </div>
 
-                        {/* Elemento decorativo inferior */}
                         <div className="mt-6 text-center">
                             <p className="text-white/80 text-sm font-medium drop-shadow-lg">
                                 💻 Desenvolvido por Elvis Ferreira
@@ -281,50 +318,19 @@
                         </div>
                     </div>
 
-                    {/* Estilos de animação customizados */}
                     <style>{`
-                        @keyframes blob {
-                            0%, 100% { transform: translate(0, 0) scale(1); }
-                            33% { transform: translate(30px, -50px) scale(1.1); }
-                            66% { transform: translate(-20px, 20px) scale(0.9); }
-                        }
-                        @keyframes float {
-                            0%, 100% { transform: translateY(0px); }
-                            50% { transform: translateY(-20px); }
-                        }
-                        @keyframes bounce-slow {
-                            0%, 100% { transform: translateY(0); }
-                            50% { transform: translateY(-10px); }
-                        }
-                        @keyframes shake {
-                            0%, 100% { transform: translateX(0); }
-                            25% { transform: translateX(-5px); }
-                            75% { transform: translateX(5px); }
-                        }
-                        .animate-blob {
-                            animation: blob 7s infinite;
-                        }
-                        .animate-float {
-                            animation: float 3s ease-in-out infinite;
-                        }
-                        .animate-bounce-slow {
-                            animation: bounce-slow 2s ease-in-out infinite;
-                        }
-                        .animate-shake {
-                            animation: shake 0.3s ease-in-out;
-                        }
-                        .animation-delay-1000 {
-                            animation-delay: 1s;
-                        }
-                        .animation-delay-2000 {
-                            animation-delay: 2s;
-                        }
-                        .animation-delay-3000 {
-                            animation-delay: 3s;
-                        }
-                        .animation-delay-4000 {
-                            animation-delay: 4s;
-                        }
+                        @keyframes blob { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } }
+                        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+                        @keyframes bounce-slow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+                        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+                        .animate-blob { animation: blob 7s infinite; }
+                        .animate-float { animation: float 3s ease-in-out infinite; }
+                        .animate-bounce-slow { animation: bounce-slow 2s ease-in-out infinite; }
+                        .animate-shake { animation: shake 0.3s ease-in-out; }
+                        .animation-delay-1000 { animation-delay: 1s; }
+                        .animation-delay-2000 { animation-delay: 2s; }
+                        .animation-delay-3000 { animation-delay: 3s; }
+                        .animation-delay-4000 { animation-delay: 4s; }
                     `}</style>
                 </div>
             );
@@ -532,26 +538,183 @@
             const [marcadores, setMarcadores] = useState({});
             const [menuCorAberto, setMenuCorAberto] = useState(null);
 
+            // ── Estados para Faltas e Ordenação ────────────────
+            const [faltas, setFaltas] = useState([]);
+            const [consultandoFaltas, setConsultandoFaltas] = useState(false);
+            const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+            // ── Estados para intervalo dinâmico ─────────────────
+            const [intervaloInicio, setIntervaloInicio] = useState('');
+            const [intervaloFim, setIntervaloFim] = useState('');
+
             const valorUficaAtual = valorUfica[ano] || VALOR_UFICA_2026;
 
-            // Carregar dados do Firebase filtrados por mês/ano
             useEffect(() => {
-                const chave = `contribuintes/${ano}/${mes}`;
-                const ref = db.ref(chave);
-                ref.on('value', (snap) => {
-                    const data = snap.val();
-                    const lista = data ? Object.entries(data).map(([k, v]) => ({ id: k, ...v })) : [];
-                    setList(lista);
+    const chave = `contribuintes/${ano}/${mes}`;
+    const ref = db.ref(chave);
+    ref.on('value', (snap) => {
+        const data = snap.val();
+        const lista = data ? Object.entries(data).map(([k, v]) => ({ id: k, ...v })) : [];
+        setList(lista);
 
-                    // Carregar marcadores
-                    const marks = {};
-                    lista.forEach(item => {
-                        if (item.marcador) marks[item.id] = item.marcador;
-                    });
-                    setMarcadores(marks);
+        const marks = {};
+        lista.forEach(item => {
+            if (item.marcador) marks[item.id] = item.marcador;
+        });
+        setMarcadores(marks);
+
+        // Calcular automaticamente o intervalo baseado nas inscrições
+        const inscricoesNumericas = lista
+            .map(item => item.inscricaoMunicipal?.trim())
+            .filter(insc => insc && !isNaN(insc))
+            .map(insc => Number(insc));
+
+        if (inscricoesNumericas.length > 0) {
+            const minInscricao = Math.min(...inscricoesNumericas);
+            const maxInscricao = Math.max(...inscricoesNumericas);
+            setIntervaloInicio(String(minInscricao));
+            setIntervaloFim(String(maxInscricao));
+        }
+    });
+    return () => ref.off();
+}, [mes, ano]);
+            
+            const requestSort = (key) => {
+                let direction = 'asc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') {
+                    direction = 'desc';
+                }
+                setSortConfig({ key, direction });
+            };
+
+            const getSortedList = () => {
+                if (!sortConfig.key) return list;
+
+                return [...list].sort((a, b) => {
+                    let aVal = a[sortConfig.key] ?? '';
+                    let bVal = b[sortConfig.key] ?? '';
+
+                    if (sortConfig.key === 'verificado') {
+                        aVal = a.verificado ? 1 : 0;
+                        bVal = b.verificado ? 1 : 0;
+                    }
+                    if (sortConfig.key === 'marcador') {
+                        aVal = marcadores[a.id] || '';
+                        bVal = marcadores[b.id] || '';
+                    }
+                    if (sortConfig.key === 'areaM2' || sortConfig.key === 'trimestreAbertura') {
+                        aVal = Number(aVal) || 0;
+                        bVal = Number(bVal) || 0;
+                    }
+
+                    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
                 });
-                return () => ref.off();
-            }, [mes, ano]);
+            };
+
+            const consultarFaltas = async () => {
+                setConsultandoFaltas(true);
+                setFaltas([]);
+
+                if (!intervaloInicio || !intervaloFim || isNaN(intervaloInicio) || isNaN(intervaloFim)) {
+                    alert('Preencha os campos "Início" e "Fim" com números válidos.');
+                    setConsultandoFaltas(false);
+                    return;
+                }
+
+                const inicio = Number(intervaloInicio);
+                const fim = Number(intervaloFim);
+
+                if (inicio > fim) {
+                    alert('O início deve ser menor ou igual ao fim.');
+                    setConsultandoFaltas(false);
+                    return;
+                }
+
+                if (fim - inicio > 2000) {
+                    alert('Intervalo muito grande (> 2000 itens). Por favor, reduza.');
+                    setConsultandoFaltas(false);
+                    return;
+                }
+
+                try {
+                    const inscricoesExistentesNoAno = new Set();
+
+                    for (let m = 0; m <= 11; m++) {
+                        const chave = `contribuintes/${ano}/${m}`;
+                        const snapshot = await db.ref(chave).once('value');
+                        const data = snapshot.val();
+                        if (data) {
+                            Object.values(data).forEach(item => {
+                                const inscr = item.inscricaoMunicipal?.trim();
+                                if (inscr && inscr !== '') {
+                                    inscricoesExistentesNoAno.add(inscr);
+                                }
+                            });
+                        }
+                    }
+
+                    const inscricoesMesAtual = new Set(
+                        list
+                            .filter(item => item.inscricaoMunicipal?.trim())
+                            .map(item => item.inscricaoMunicipal.trim())
+                    );
+
+                    const intervaloEsperado = new Set();
+                    for (let i = inicio; i <= fim; i++) {
+                        intervaloEsperado.add(String(i));
+                    }
+
+                    const faltandoNoMes = [...intervaloEsperado].filter(inscr => !inscricoesMesAtual.has(inscr));
+
+                    const faltasComInfo = [];
+
+                    for (const inscr of faltandoNoMes) {
+                        let encontradoEmOutroMes = null;
+                        let mesEncontrado = null;
+
+                        for (let m = 0; m <= 11; m++) {
+                            if (m === mes) continue;
+                            const chave = `contribuintes/${ano}/${m}`;
+                            const snap = await db.ref(chave)
+                                .orderByChild('inscricaoMunicipal')
+                                .equalTo(inscr)
+                                .limitToFirst(1)
+                                .once('value');
+
+                            const val = snap.val();
+                            if (val) {
+                                encontradoEmOutroMes = Object.values(val)[0];
+                                mesEncontrado = m;
+                                break;
+                            }
+                        }
+
+                        faltasComInfo.push({
+                            inscricaoMunicipal: inscr,
+                            documento: encontradoEmOutroMes?.documento || '-',
+                            razaoSocial: encontradoEmOutroMes?.razaoSocial || 'Não encontrado',
+                            status: encontradoEmOutroMes 
+                                ? `Existe em ${MESES[mesEncontrado]}/${ano}` 
+                                : 'Não cadastrada em nenhum mês deste ano',
+                        });
+                    }
+
+                    setFaltas(faltasComInfo);
+
+                    if (faltasComInfo.length === 0) {
+                        alert(`Nenhuma falta no intervalo ${inicio}–${fim} para ${MESES[mes]}/${ano}.`);
+                    } else {
+                        alert(`Encontradas ${faltasComInfo.length} faltas no intervalo informado!`);
+                    }
+                } catch (err) {
+                    console.error('Erro ao consultar faltas:', err);
+                    alert('Erro ao consultar faltas: ' + err.message);
+                } finally {
+                    setConsultandoFaltas(false);
+                }
+            };
 
             const salvarNoFirebase = async (contribuinte) => {
                 const chave = `contribuintes/${ano}/${mes}`;
@@ -619,7 +782,6 @@
                         item.id === id ? { ...item, ...atualizado } : item
                     ));
 
-                    // Atualizar no Firebase
                     await db.ref(`contribuintes/${ano}/${mes}/${id}`).update(atualizado);
 
                     setConsultasRealizadas(prev => prev + 1);
@@ -674,10 +836,7 @@
                 const faixa = TABELA_VISA.find(f => area >= f.min && area <= f.max);
                 if (!faixa) return 0;
 
-                if (tributacao === 'SIMPLES') {
-                    return faixa.valorME_EPP;
-                }
-
+                if (tributacao === 'SIMPLES') return faixa.valorME_EPP;
                 return faixa.valorIntegral;
             };
 
@@ -695,7 +854,6 @@
                 };
 
                 if (tipoPessoa === 'CPF') return 2.5;
-
                 return valores[tributacao] || 0;
             };
 
@@ -707,16 +865,6 @@
             const calcDashboard = () => {
                 let listaCalculo = list;
 
-                // Aplicar filtro de visualização
-                if (modoVisualizacao === 'anual') {
-                    // Carregar todos os meses do ano
-                    // Por simplicidade, vamos usar apenas a lista atual
-                    listaCalculo = list;
-                } else if (modoVisualizacao === 'periodo') {
-                    // Filtrar por período
-                    listaCalculo = list;
-                }
-
                 const total = listaCalculo.length;
                 const pendentes = listaCalculo.filter(l => l.taxasLancadas === 'NAO').length;
                 const verificados = listaCalculo.filter(l => l.verificado).length;
@@ -724,9 +872,7 @@
                 const documentos = {};
                 const duplicados = [];
                 listaCalculo.forEach(l => {
-                    if (documentos[l.documento]) {
-                        duplicados.push(l.documento);
-                    }
+                    if (documentos[l.documento]) duplicados.push(l.documento);
                     documentos[l.documento] = (documentos[l.documento] || 0) + 1;
                 });
                 const totalDuplicados = new Set(duplicados).size;
@@ -795,7 +941,6 @@
                     let novos = 0;
                     let ignorados = 0;
 
-                    // Obter documentos já verificados
                     const docsVerificados = new Set(list.filter(l => l.verificado).map(l => l.documento));
 
                     for (const l of linhas) {
@@ -808,7 +953,6 @@
 
                         const clean = doc.replace(/\D/g, '');
 
-                        // Ignorar se já foi verificado
                         if (docsVerificados.has(clean)) {
                             ignorados++;
                             continue;
@@ -887,12 +1031,9 @@
             const getDuplicados = () => {
                 const documentos = {};
                 list.forEach(l => {
-                    if (!documentos[l.documento]) {
-                        documentos[l.documento] = [];
-                    }
+                    if (!documentos[l.documento]) documentos[l.documento] = [];
                     documentos[l.documento].push(l);
                 });
-
                 return Object.values(documentos).filter(grupo => grupo.length > 1).flat();
             };
 
@@ -914,35 +1055,25 @@
                             </select>
 
                             {modoVisualizacao === 'mensal' && (
-                                <>
-                                    <select value={mes} onChange={e => setMes(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
-                                        {MESES.map((m, i) => (
-                                            <option key={i} value={i}>{m}</option>
-                                        ))}
-                                    </select>
-                                </>
+                                <select value={mes} onChange={e => setMes(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                    {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                                </select>
                             )}
 
                             {modoVisualizacao === 'periodo' && (
                                 <>
                                     <select value={periodoInicio} onChange={e => setPeriodoInicio(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
-                                        {MESES.map((m, i) => (
-                                            <option key={i} value={i}>{m}</option>
-                                        ))}
+                                        {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
                                     </select>
                                     <span className="flex items-center">até</span>
                                     <select value={periodoFim} onChange={e => setPeriodoFim(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
-                                        {MESES.map((m, i) => (
-                                            <option key={i} value={i}>{m}</option>
-                                        ))}
+                                        {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
                                     </select>
                                 </>
                             )}
 
                             <select value={ano} onChange={e => setAno(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
-                                {[2026, 2027, 2028, 2029, 2030].map(a => (
-                                    <option key={a} value={a}>{a}</option>
-                                ))}
+                                {[2026, 2027, 2028, 2029, 2030].map(a => <option key={a} value={a}>{a}</option>)}
                             </select>
 
                             <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded border border-blue-200">
@@ -961,6 +1092,29 @@
                                     💵 UFICA {ano}: R$ {formatarMoeda(valorUficaAtual)}
                                 </div>
                             )}
+
+                            <div className="flex items-end gap-4">
+                                <div>
+                                    <label className="block text-sm text-gray-700 font-medium">Início intervalo</label>
+                                    <input
+                                        type="number"
+                                        value={intervaloInicio}
+                                        onChange={e => setIntervaloInicio(e.target.value)}
+                                        placeholder="Ex: 154610"
+                                        className="px-3 py-2 border rounded bg-white w-32"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-700 font-medium">Fim intervalo</label>
+                                    <input
+                                        type="number"
+                                        value={intervaloFim}
+                                        onChange={e => setIntervaloFim(e.target.value)}
+                                        placeholder="Ex: 154694"
+                                        className="px-3 py-2 border rounded bg-white w-32"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-7 gap-4 mb-6">
@@ -968,32 +1122,26 @@
                                 <div className="text-sm text-gray-600 mb-1">Total</div>
                                 <div className="text-3xl font-bold text-gray-800">{dashboard.total}</div>
                             </div>
-
                             <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                                 <div className="text-sm text-gray-600 mb-1">Pendentes</div>
                                 <div className="text-3xl font-bold text-yellow-600">{dashboard.pendentes}</div>
                             </div>
-
                             <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                                 <div className="text-sm text-gray-600 mb-1">✅ Verificados</div>
                                 <div className="text-3xl font-bold text-green-600">{dashboard.verificados}</div>
                             </div>
-
                             <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
                                 <div className="text-sm text-gray-600 mb-1">⚠️ Duplicados</div>
                                 <div className="text-3xl font-bold text-orange-600">{dashboard.totalDuplicados}</div>
                             </div>
-
                             <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                                 <div className="text-sm text-gray-600 mb-1">Total TFLF</div>
                                 <div className="text-3xl font-bold text-blue-600">R$ {formatarMoeda(dashboard.totalReais)}</div>
                             </div>
-
                             <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
                                 <div className="text-sm text-gray-600 mb-1">Total ISSQN</div>
                                 <div className="text-3xl font-bold text-indigo-600">R$ {formatarMoeda(dashboard.totalISSQN)}</div>
                             </div>
-
                             <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                                 <div className="text-sm text-gray-600 mb-1">Vigilância</div>
                                 <div className="text-3xl font-bold text-purple-600">R$ {formatarMoeda(dashboard.vigilancia)}</div>
@@ -1001,7 +1149,7 @@
                         </div>
 
                         <div className="bg-white rounded-lg shadow p-4 mb-6">
-                            <div className="flex gap-2 mb-4 border-b">
+                            <div className="flex gap-2 mb-4 border-b overflow-x-auto">
                                 <button onClick={() => setAbaAtiva('principal')} className={`px-4 py-2 font-medium ${abaAtiva === 'principal' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}>
                                     📋 Principal ({list.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO').length})
                                 </button>
@@ -1011,12 +1159,14 @@
                                 <button onClick={() => setAbaAtiva('autonomo')} className={`px-4 py-2 font-medium ${abaAtiva === 'autonomo' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-600'}`}>
                                     👤 Autônomo ({list.filter(l => l.tributacao === 'AUTONOMO').length})
                                 </button>
-                                
                                 <button onClick={() => setAbaAtiva('visa')} className={`px-4 py-2 font-medium ${abaAtiva === 'visa' ? 'text-purple-600 border-b-2 border-purple-600' : 'text-gray-600'}`}>
                                     🏥 VISA ({list.filter(l => l.precisaVisa).length})
                                 </button>
-                                    <button onClick={() => setAbaAtiva('duplicados')} className={`px-4 py-2 font-medium ${abaAtiva === 'duplicados' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-600'}`}>
+                                <button onClick={() => setAbaAtiva('duplicados')} className={`px-4 py-2 font-medium ${abaAtiva === 'duplicados' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-600'}`}>
                                     ⚠️ Duplicidade ({dashboard.totalDuplicados})
+                                </button>
+                                <button onClick={() => setAbaAtiva('Faltas')} className={`px-4 py-2 font-medium ${abaAtiva === 'Faltas' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-600'}`}>
+                                    ❗ Faltas ({faltas.length})
                                 </button>
                             </div>
 
@@ -1032,6 +1182,14 @@
 
                                 <button onClick={consultarTodos} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={consultandoQueue.length > 0}>
                                     {consultandoQueue.length > 0 ? '🔄 Consultando...' : '🔍 Consultar CNPJs'}
+                                </button>
+
+                                <button
+                                    onClick={consultarFaltas}
+                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                                    disabled={consultandoFaltas}
+                                >
+                                    {consultandoFaltas ? '🔄 Buscando...' : '🔍 Consultar Faltas'}
                                 </button>
 
                                 <button onClick={exportCSV} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
@@ -1071,12 +1229,24 @@
                                 <table className="w-full text-sm">
                                     <thead className="bg-indigo-600 text-white">
                                         <tr>
-                                            <th className="px-3 py-2 text-left">Status</th>
-                                            <th className="px-3 py-2 text-left">Cor</th>
-                                            <th className="px-3 py-2 text-left">Inscrição</th>
-                                            <th className="px-3 py-2 text-left">Documento</th>
-                                            <th className="px-3 py-2 text-left">Nome</th>
-                                            <th className="px-3 py-2">Situação</th>
+                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('verificado')}>
+                                                Status {sortConfig.key === 'verificado' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('marcador')}>
+                                                Cor {sortConfig.key === 'marcador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('inscricaoMunicipal')}>
+                                                Inscrição {sortConfig.key === 'inscricaoMunicipal' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('documento')}>
+                                                Documento {sortConfig.key === 'documento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('razaoSocial')}>
+                                                Nome {sortConfig.key === 'razaoSocial' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('situacao')}>
+                                                Situação {sortConfig.key === 'situacao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
                                             <th className="px-3 py-2">Porte</th>
                                             <th className="px-3 py-2">Tributação</th>
                                             <th className="px-3 py-2">VISA?</th>
@@ -1089,30 +1259,66 @@
                                             <th className="px-3 py-2">ISSQN</th>
                                             <th className="px-3 py-2">VISA</th>
                                             <th className="px-3 py-2">Lançado</th>
+                                            <th className="px-3 py-2">Status no Ano</th>
                                             <th className="px-3 py-2">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {(() => {
-                                            let listaExibir = list;
+                                            let listaExibir = getSortedList();
 
                                             if (abaAtiva === 'principal') {
-                                                listaExibir = list.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO');
+                                                listaExibir = listaExibir.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO');
                                             } else if (abaAtiva === 'mei') {
-                                                listaExibir = list.filter(l => l.tributacao === 'MEI');
+                                                listaExibir = listaExibir.filter(l => l.tributacao === 'MEI');
                                             } else if (abaAtiva === 'autonomo') {
-                                                listaExibir = list.filter(l => l.tributacao === 'AUTONOMO');
+                                                listaExibir = listaExibir.filter(l => l.tributacao === 'AUTONOMO');
+                                            } else if (abaAtiva === 'visa') {
+                                                listaExibir = listaExibir.filter(l => l.precisaVisa);
                                             } else if (abaAtiva === 'duplicados') {
                                                 listaExibir = getDuplicados();
-                                            } else if (abaAtiva === 'visa') {
-                                                listaExibir = list.filter(l => l.precisaVisa);
+                                            } else if (abaAtiva === 'Faltas') {
+                                                if (faltas.length === 0) {
+                                                    return (
+                                                        <tr>
+                                                            <td colSpan="20" className="px-4 py-8 text-center text-gray-500">
+                                                                Clique em "Consultar Faltas" para verificar inscrições ausentes neste mês.
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
+
+                                                return faltas.map((falta, idx) => (
+                                                    <tr key={idx} className="bg-red-50 border-t hover:bg-red-100">
+                                                        <td className="px-3 py-2 text-center">❗</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2 font-medium">{falta.inscricaoMunicipal}</td>
+                                                        <td className="px-3 py-2 font-mono">{falta.documento}</td>
+                                                        <td className="px-3 py-2">{falta.razaoSocial}</td>
+                                                        <td className="px-3 py-2 text-center">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2 text-center">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2 text-right">-</td>
+                                                        <td className="px-3 py-2 text-right">-</td>
+                                                        <td className="px-3 py-2 text-right">-</td>
+                                                        <td className="px-3 py-2">-</td>
+                                                        <td className="px-3 py-2 text-sm text-gray-600">{falta.status}</td>
+                                                        <td className="px-3 py-2 text-center">-</td>
+                                                    </tr>
+                                                ));
                                             }
 
                                             if (listaExibir.length === 0) {
                                                 return (
                                                     <tr>
-                                                        <td colSpan="19" className="px-4 py-8 text-center text-gray-500">
-                                                            {abaAtiva === 'duplicados' ? '✅ Nenhum duplicado!' : 'Nenhum contribuinte. Importe um TXT.'}
+                                                        <td colSpan="20" className="px-4 py-8 text-center text-gray-500">
+                                                            {abaAtiva === 'duplicados' ? '✅ Nenhum duplicado!' : 'Nenhum contribuinte nesta aba.'}
                                                         </td>
                                                     </tr>
                                                 );
@@ -1140,7 +1346,10 @@
                                                 return (
                                                     <tr key={l.id} className={`border-t hover:bg-gray-50 ${getRowBgColor()}`}>
                                                         <td className="px-3 py-2 text-center">
-                                                            {consultando ? <span className="text-blue-600">🔄</span> : l.verificado ? <span className="text-green-600">✅</span> : isDuplicado ? <span className="text-orange-600">⚠️</span> : <span className="text-gray-400">⏳</span>}
+                                                            {consultando ? <span className="text-blue-600">🔄</span> :
+                                                             l.verificado ? <span className="text-green-600">✅</span> :
+                                                             isDuplicado ? <span className="text-orange-600">⚠️</span> :
+                                                             <span className="text-gray-400">⏳</span>}
                                                         </td>
                                                         <td className="px-3 py-2">
                                                             <div className="relative">
@@ -1163,14 +1372,9 @@
                                                                             />
                                                                         ))}
                                                                         <button
-                                                                            onClick={() => {
-                                                                                toggleMarcador(l.id, null);
-                                                                                setMenuCorAberto(null);
-                                                                            }}
+                                                                            onClick={() => { toggleMarcador(l.id, null); setMenuCorAberto(null); }}
                                                                             className="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-gray-800 bg-white text-xs"
-                                                                        >
-                                                                            ✕
-                                                                        </button>
+                                                                        >✕</button>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1181,11 +1385,10 @@
                                                         <td className="px-3 py-2 text-center">
                                                             <span className={`px-2 py-1 rounded text-xs font-semibold ${l.situacao === 'Ativa' ? 'bg-green-100 text-green-800 border border-green-300' :
                                                                 l.situacao === 'Suspensa' ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' :
-                                                                    l.situacao === 'Inapta' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                                                                        l.situacao === 'Baixada' ? 'bg-red-100 text-red-800 border border-red-300' :
-                                                                            l.situacao === 'Nula' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
-                                                                                'bg-gray-100 text-gray-700 border border-gray-300'
-                                                                }`}>
+                                                                l.situacao === 'Inapta' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                                                                l.situacao === 'Baixada' ? 'bg-red-100 text-red-800 border border-red-300' :
+                                                                l.situacao === 'Nula' ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                                                                'bg-gray-100 text-gray-700 border border-gray-300'}`}>
                                                                 {l.situacao || '-'}
                                                             </span>
                                                         </td>
@@ -1247,6 +1450,7 @@
                                                                 <option value="SIM">SIM</option>
                                                             </select>
                                                         </td>
+                                                        <td className="px-3 py-2 text-sm text-gray-600">-</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <button onClick={() => excluir(l.id)} className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs mr-1">🗑️</button>
                                                             {l.tipoPessoa === 'CNPJ' && !l.verificado && <button onClick={() => consultarCNPJ(l.documento, l.id)} className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs">🔍</button>}
@@ -1268,7 +1472,3 @@
     </script>
 </body>
 </html>
-
-
-
-
