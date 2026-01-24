@@ -525,6 +525,22 @@
                 });
                 return () => refFaltas.off();
             }, [mes, ano]);
+
+            // Carregar faltas do Firebase
+            useEffect(() => {
+                const chaveFaltas = `faltas/${ano}/${mes}`;
+                const refFaltas = db.ref(chaveFaltas);
+                refFaltas.on('value', (snap) => {
+                    const data = snap.val();
+                    if (data) {
+                        const listaFaltas = Object.entries(data).map(([k, v]) => ({ id: k, ...v }));
+                        setFaltas(listaFaltas);
+                    } else {
+                        setFaltas([]);
+                    }
+                });
+                return () => refFaltas.off();
+            }, [mes, ano]);
             
             const requestSort = (key) => {
                 let direction = 'asc';
@@ -1418,6 +1434,7 @@
 </body>
 
 </html>
+
 
 
 
