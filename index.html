@@ -539,59 +539,6 @@
                     refFaltas.off('value', listener);
                 };
             }, [mes, ano]);
-            // Carregar faltas do Firebase
-            useEffect(() => {
-                const chaveFaltas = `faltas/${ano}/${mes}`;
-                const refFaltas = db.ref(chaveFaltas);
-                
-                const listener = refFaltas.on('value', (snap) => {
-                    const data = snap.val();
-                    console.log('📥 Dados de faltas carregados:', data);
-                    
-                    if (data) {
-                        const listaFaltas = Object.entries(data).map(([k, v]) => ({ id: k, ...v }));
-                        console.log('📋 Faltas processadas:', listaFaltas);
-                        setFaltas(listaFaltas);
-                    } else {
-                        console.log('⚠️ Nenhuma falta encontrada');
-                        setFaltas([]);
-                    }
-                });
-                
-                return () => refFaltas.off('value', listener);
-            }, [mes, ano]);
-
-            // Carregar faltas do Firebase
-            useEffect(() => {
-                const chaveFaltas = `faltas/${ano}/${mes}`;
-                const refFaltas = db.ref(chaveFaltas);
-                refFaltas.on('value', (snap) => {
-                    const data = snap.val();
-                    if (data) {
-                        const listaFaltas = Object.entries(data).map(([k, v]) => ({ id: k, ...v }));
-                        setFaltas(listaFaltas);
-                    } else {
-                        setFaltas([]);
-                    }
-                });
-                return () => refFaltas.off();
-            }, [mes, ano]);
-
-            // Carregar faltas do Firebase
-            useEffect(() => {
-                const chaveFaltas = `faltas/${ano}/${mes}`;
-                const refFaltas = db.ref(chaveFaltas);
-                refFaltas.on('value', (snap) => {
-                    const data = snap.val();
-                    if (data) {
-                        const listaFaltas = Object.entries(data).map(([k, v]) => ({ id: k, ...v }));
-                        setFaltas(listaFaltas);
-                    } else {
-                        setFaltas([]);
-                    }
-                });
-                return () => refFaltas.off();
-            }, [mes, ano]);
             
             const requestSort = (key) => {
                 let direction = 'asc';
@@ -716,6 +663,20 @@
                     }
 
                     setFaltas(faltasComInfo);
+
+                    // ✅ SALVAR AS FALTAS NO FIREBASE
+                    const chaveFaltas = `faltas/${ano}/${mes}`;
+                    console.log('💾 Salvando faltas no Firebase:', chaveFaltas);
+                    
+                    // Limpar faltas antigas deste mês/ano primeiro
+                    await db.ref(chaveFaltas).remove();
+                    
+                    // Salvar cada falta
+                    for (const falta of faltasComInfo) {
+                        await db.ref(chaveFaltas).push(falta);
+                    }
+                    
+                    console.log('✅ Faltas salvas com sucesso no Firebase!');
 
                     if (faltasComInfo.length === 0) {
                         alert(`Nenhuma falta no intervalo ${inicio}–${fim} para ${MESES[mes]}/${ano}.`);
