@@ -11,6 +11,17 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <style>
+        /* Força emojis do Twemoji (estilo Twitter) em todos os sistemas */
+        img.emoji {
+            height: 1.2em;
+            width: 1.2em;
+            margin: 0 .05em 0 .1em;
+            vertical-align: -0.2em;
+            display: inline-block;
+        }
+    </style>
 </head>
 <body>
     <div id="root"></div>
@@ -514,7 +525,7 @@
             // Carregar faltas do Firebase
             useEffect(() => {
                 setCarregandoFaltas(true);
-                const chaveFaltas = `faltas/${ano}/${mes}`;
+                const chaveFaltas = `contribuintes/_faltas_${ano}_${mes}`;
                 const refFaltas = db.ref(chaveFaltas);
                 
                 console.log('🔄 Carregando faltas de:', chaveFaltas);
@@ -665,7 +676,7 @@
                     setFaltas(faltasComInfo);
 
                     // ✅ SALVAR AS FALTAS NO FIREBASE
-                    const chaveFaltas = `faltas/${ano}/${mes}`;
+                    const chaveFaltas = `contribuintes/_faltas_${ano}_${mes}`;
                     console.log('💾 Salvando faltas no Firebase:', chaveFaltas);
                     
                     // Limpar faltas antigas deste mês/ano primeiro
@@ -1443,6 +1454,25 @@
 
         ReactDOM.render(<App />, document.getElementById('root'));
     </script>
+        
+        // Converte todos os emojis para Twemoji após renderização
+        const observer = new MutationObserver(() => {
+            twemoji.parse(document.body, {
+                folder: 'svg',
+                ext: '.svg'
+            });
+        });
+        
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true 
+        });
+        
+        // Conversão inicial
+        setTimeout(() => twemoji.parse(document.body, {
+            folder: 'svg',
+            ext: '.svg'
+        }), 100);
 </body>
 
 </html>
