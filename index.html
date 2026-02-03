@@ -26,6 +26,9 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
+const ANO_MINIMO = 2018;
+const ANO_MAXIMO = 2026;
+
         const { useState, useEffect } = React;
 
         const firebaseConfig = {
@@ -61,6 +64,52 @@
             { min: 1501, max: Infinity, valorIntegral: 1256.50, valorME_EPP: 628.25 }
         ];
 
+
+        // ============================================
+        // ERROR BOUNDARY - Captura erros React
+        // ============================================
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+
+            componentDidCatch(error, errorInfo) {
+                console.error('🚨 Erro capturado:', error, errorInfo);
+            }
+
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
+                            <div className="bg-white rounded-lg shadow-2xl p-8 max-w-lg">
+                                <div className="text-center mb-6">
+                                    <div className="text-7xl mb-4">⚠️</div>
+                                    <h1 className="text-3xl font-bold text-red-600 mb-3">Erro na Aplicação</h1>
+                                    <p className="text-gray-700 text-lg">Ocorreu um erro inesperado.</p>
+                                </div>
+                                <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+                                    <p className="text-sm text-red-900 font-mono break-all">
+                                        {this.state.error?.message || 'Erro desconhecido'}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => window.location.reload()} 
+                                    className="w-full bg-red-600 text-white px-6 py-4 rounded-lg hover:bg-red-700 font-bold text-lg shadow-lg"
+                                >
+                                    🔄 Recarregar Página
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
         function App() {
             const [auth, setAuth] = useState(false);
             const [loading, setLoading] = useState(true);
@@ -354,7 +403,7 @@
                         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
                             <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-2xl font-bold">📝 Controle de Numeração - {year}</h2>
-                                <button onClick={exportCSV} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">📊 Exportar CSV</button>
+                                <button onClick={exportCSV} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Exportar CSV</button>
                             </div>
 
                             <div className="grid md:grid-cols-4 gap-4 mb-6">
@@ -503,34 +552,114 @@
             const valorUficaAtual = valorUfica[ano] || VALOR_UFICA_2026;
 
             useEffect(() => {
-    const chave = `contribuintes/${ano}/${mes}`;
-    const ref = db.ref(chave);
-    ref.on('value', (snap) => {
-        const data = snap.val();
-        const lista = data ? Object.entries(data).map(([k, v]) => ({ id: k, ...v })) : [];
-        setList(lista);
+                const carregarDados = async () => {
+                    try {
+                        console.log('🔄 Carregando:', { modoVisualizacao, ano, mes });
+                        
+                        if (modoVisualizacao === 'mensal') {
+                            // Modo mensal: carregar apenas o mês selecionado
+                            const chave = `contribuintes/${ano}/${mes}`;
+                            const snapshot = await db.ref(chave).once('value');
+                            const data = snapshot.val();
+                            
+                            // ✅ VALIDAÇÃO: Verificar se data existe e é objeto
+                            if (data && typeof data === 'object') {
+                                const lista = Object.entries(data)
+                                    .filter(([k, v]) => v && typeof v === 'object')
+                                    .map(([k, v]) => ({ id: k, ...v }));
+                                setList(lista);
 
-        const marks = {};
-        lista.forEach(item => {
-            if (item.marcador) marks[item.id] = item.marcador;
-        });
-        setMarcadores(marks);
+                                const marks = {};
+                                lista.forEach(item => {
+                                    if (item && item.marcador) marks[item.id] = item.marcador;
+                                });
+                                setMarcadores(marks);
 
-        // Calcular automaticamente o intervalo baseado nas inscrições
-        const inscricoesNumericas = lista
-            .map(item => item.inscricaoMunicipal?.trim())
-            .filter(insc => insc && !isNaN(insc))
-            .map(insc => Number(insc));
+                                const inscricoesNumericas = lista
+                                    .filter(item => item && item.inscricaoMunicipal)
+                                    .map(item => item.inscricaoMunicipal.trim())
+                                    .filter(insc => insc && !isNaN(insc))
+                                    .map(insc => Number(insc));
 
-        if (inscricoesNumericas.length > 0) {
-            const minInscricao = Math.min(...inscricoesNumericas);
-            const maxInscricao = Math.max(...inscricoesNumericas);
-            setIntervaloInicio(String(minInscricao));
-            setIntervaloFim(String(maxInscricao));
-        }
-    });
-    return () => ref.off();
-}, [mes, ano]);
+                                if (inscricoesNumericas.length > 0) {
+                                    const minInscricao = Math.min(...inscricoesNumericas);
+                                    const maxInscricao = Math.max(...inscricoesNumericas);
+                                    setIntervaloInicio(String(minInscricao));
+                                    setIntervaloFim(String(maxInscricao));
+                                }
+                            } else {
+                                console.warn('⚠️ Sem dados para', chave);
+                                setList([]);
+                                setMarcadores({});
+                            }
+                            
+                        } else if (modoVisualizacao === 'anual') {
+                            // Modo anual: carregar todos os meses do ano
+                            const listaCombinada = [];
+                            const marksCombinados = {};
+                            
+                            for (let m = 0; m <= 11; m++) {
+                                const snapshot = await db.ref(`contribuintes/${ano}/${m}`).once('value');
+                                const data = snapshot.val();
+                                
+                                // ✅ VALIDAÇÃO: Verificar se data existe e é objeto
+                                if (data && typeof data === 'object') {
+                                    Object.entries(data).forEach(([k, v]) => {
+                                        // ✅ VALIDAÇÃO: Verificar se v é objeto válido
+                                        if (v && typeof v === 'object') {
+                                            listaCombinada.push({ id: k, ...v, mesOrigem: m });
+                                            if (v.marcador) marksCombinados[k] = v.marcador;
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            console.log('✅ Anual:', listaCombinada.length, 'registros');
+                            setList(listaCombinada);
+                            setMarcadores(marksCombinados);
+                            
+                        } else if (modoVisualizacao === 'periodo') {
+                            // Modo período: carregar meses do período selecionado
+                            const listaCombinada = [];
+                            const marksCombinados = {};
+                            
+                            // ✅ VALIDAÇÃO: Garantir valores válidos
+                            const inicio = Math.min(Math.max(0, periodoInicio || 0), 11);
+                            const fim = Math.min(Math.max(0, periodoFim || 11), 11);
+                            const mesInicio = Math.min(inicio, fim);
+                            const mesFim = Math.max(inicio, fim);
+                            
+                            for (let m = mesInicio; m <= mesFim; m++) {
+                                const snapshot = await db.ref(`contribuintes/${ano}/${m}`).once('value');
+                                const data = snapshot.val();
+                                
+                                // ✅ VALIDAÇÃO: Verificar se data existe e é objeto
+                                if (data && typeof data === 'object') {
+                                    Object.entries(data).forEach(([k, v]) => {
+                                        // ✅ VALIDAÇÃO: Verificar se v é objeto válido
+                                        if (v && typeof v === 'object') {
+                                            listaCombinada.push({ id: k, ...v, mesOrigem: m });
+                                            if (v.marcador) marksCombinados[k] = v.marcador;
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            console.log('✅ Período:', listaCombinada.length, 'registros');
+                            setList(listaCombinada);
+                            setMarcadores(marksCombinados);
+                        }
+                    } catch (error) {
+                        console.error('❌ Erro ao carregar dados:', error);
+                        // ✅ NÃO deixar tela branca - mostrar lista vazia
+                        setList([]);
+                        setMarcadores({});
+                        alert('Erro ao carregar dados do ano ' + ano + ':\n' + error.message);
+                    }
+                };
+                
+                carregarDados();
+            }, [mes, ano, modoVisualizacao, periodoInicio, periodoFim]);
 
             // Carregar faltas do Firebase
             useEffect(() => {
@@ -1196,39 +1325,39 @@
                             <h2 className="text-2xl font-bold">Lançamento de Taxas</h2>
                         </div>
 
-                        <div className="flex gap-4 mb-4 flex-wrap">
-                            <select value={modoVisualizacao} onChange={e => setModoVisualizacao(e.target.value)} className="px-4 py-2 border rounded bg-white">
+                        <div className="flex gap-4 mb-4 flex-wrap items-center">
+                            <select value={modoVisualizacao} onChange={e => setModoVisualizacao(e.target.value)} className="px-4 py-2 border rounded bg-white min-w-[180px]">
                                 <option value="mensal">📅 Mensal</option>
                                 <option value="anual">📊 Consolidado Anual</option>
                                 <option value="periodo">📆 Por Período</option>
                             </select>
 
                             {modoVisualizacao === 'mensal' && (
-                                <select value={mes} onChange={e => setMes(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                <select value={mes} onChange={e => setMes(Number(e.target.value))} className="px-4 py-2 border rounded bg-white min-w-[140px]">
                                     {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
                                 </select>
                             )}
 
                             {modoVisualizacao === 'periodo' && (
                                 <>
-                                    <select value={periodoInicio} onChange={e => setPeriodoInicio(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                    <select value={periodoInicio} onChange={e => setPeriodoInicio(Number(e.target.value))} className="px-4 py-2 border rounded bg-white min-w-[140px]">
                                         {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
                                     </select>
-                                    <span className="flex items-center">até</span>
-                                    <select value={periodoFim} onChange={e => setPeriodoFim(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                                    <span className="flex items-center text-gray-600 font-medium">até</span>
+                                    <select value={periodoFim} onChange={e => setPeriodoFim(Number(e.target.value))} className="px-4 py-2 border rounded bg-white min-w-[140px]">
                                         {MESES.map((m, i) => <option key={i} value={i}>{m}</option>)}
                                     </select>
                                 </>
                             )}
 
-                            <select value={ano} onChange={e => setAno(Number(e.target.value))} className="px-4 py-2 border rounded bg-white">
+                            <select value={ano} onChange={e => setAno(Number(e.target.value))} className="px-4 py-2 border rounded bg-white min-w-[100px]">
                                 {[2026, 2027, 2028, 2029, 2030].map(a => <option key={a} value={a}>{a}</option>)}
                             </select>
 
-                            <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded border border-blue-200">
-                                {modoVisualizacao === 'mensal' && `📅 ${MESES[mes]}/${ano}`}
-                                {modoVisualizacao === 'anual' && `📊 Ano ${ano}`}
-                                {modoVisualizacao === 'periodo' && `📆 ${MESES[periodoInicio]} - ${MESES[periodoFim]}/${ano}`}
+                            <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded border border-blue-200 font-medium min-w-[180px] text-center">
+                                {modoVisualizacao === 'mensal' && `${MESES[mes]}/${ano}`}
+                                {modoVisualizacao === 'anual' && `Ano ${ano}`}
+                                {modoVisualizacao === 'periodo' && `${MESES[periodoInicio]} - ${MESES[periodoFim]}/${ano}`}
                             </div>
 
                             {ano >= 2027 ? (
@@ -1331,7 +1460,7 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">📊 Situação</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Situação</label>
                                     <select 
                                         value={filtros.situacao} 
                                         onChange={e => setFiltros({...filtros, situacao: e.target.value})}
@@ -1428,7 +1557,7 @@
                                 </button>
 
                                 <button onClick={exportCSV} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                                    📊 Exportar CSV
+                                    Exportar CSV
                                 </button>
 
                                 <button onClick={fazerBackup} className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
@@ -1442,6 +1571,23 @@
                             </div>
                         </div>
 
+
+                        {modoVisualizacao !== 'mensal' && (
+                            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                                <div className="flex">
+                                    <div className="flex-shrink-0">
+                                        <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="text-sm text-yellow-700">
+                                            <strong>Modo de visualização {modoVisualizacao === 'anual' ? 'Anual' : 'por Período'}:</strong> Você está vendo dados consolidados. Algumas funções (inserir, importar, consultar faltas) estão desabilitadas. Volte ao modo "Mensal" para editar.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div className="bg-white rounded-lg shadow overflow-hidden">
                             {modalInserir && (
                                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1719,7 +1865,12 @@
             );
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>, 
+            document.getElementById('root')
+        );
         
         // Converte todos os emojis para Twemoji após renderização
         const observer = new MutationObserver(() => {
