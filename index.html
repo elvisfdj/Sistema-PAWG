@@ -486,6 +486,16 @@
             const [carregandoFaltas, setCarregandoFaltas] = useState(true);
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
+            // ── Estados para Filtros Avançados ─────────────────
+            const [filtros, setFiltros] = useState({
+                busca: '',
+                auditor: '',
+                situacao: '',
+                tributacao: '',
+                apenasVerificados: false,
+                apenasPendentes: false
+            });
+
             // ── Estados para intervalo dinâmico ─────────────────
             const [intervaloInicio, setIntervaloInicio] = useState('');
             const [intervaloFim, setIntervaloFim] = useState('');
@@ -1001,6 +1011,159 @@
                 a.click();
             };
 
+            // ============================================
+            // FUNÇÃO DE BACKUP COMPLETO
+            // ============================================
+            const fazerBackup = async () => {
+                try {
+                    const confirmacao = confirm('💾 Deseja fazer backup completo dos dados?\n\nIsso salvará TODOS os contribuintes de todos os meses/anos.');
+                    if (!confirmacao) return;
+
+                    const dados = {};
+                    
+                    // Backup de contribuintes de todos os anos/meses
+                    const anosParaBackup = [2024, 2025, 2026, 2027];
+                    
+                    for (const anoBackup of anosParaBackup) {
+                        dados[`contribuintes_${anoBackup}`] = {};
+                        
+                        for (let mesBackup = 0; mesBackup <= 11; mesBackup++) {
+                            const snapshot = await db.ref(`contribuintes/${anoBackup}/${mesBackup}`).once('value');
+                            const dadosMes = snapshot.val();
+                            if (dadosMes) {
+                                dados[`contribuintes_${anoBackup}`][MESES[mesBackup]] = dadosMes;
+                            }
+                        }
+                    }
+                    
+                    // Backup de faltas
+                    for (const anoBackup of anosParaBackup) {
+                        for (let mesBackup = 0; mesBackup <= 11; mesBackup++) {
+                            const snapshotFaltas = await db.ref(`contribuintes/_faltas_${anoBackup}_${mesBackup}`).once('value');
+                            const dadosFaltas = snapshotFaltas.val();
+                            if (dadosFaltas) {
+                                if (!dados.faltas) dados.faltas = {};
+                                dados.faltas[`${anoBackup}_${mesBackup}`] = dadosFaltas;
+                            }
+                        }
+                    }
+                    
+                    // Criar arquivo JSON para download
+                    const dataStr = JSON.stringify(dados, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    const dataHora = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                    link.download = `backup_pawg_${dataHora}.json`;
+                    link.click();
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    alert('✅ Backup realizado com sucesso!\n\nArquivo salvo: backup_pawg_' + dataHora + '.json');
+                } catch (error) {
+                    console.error('Erro ao fazer backup:', error);
+                    alert('❌ Erro ao fazer backup: ' + error.message);
+                }
+            };
+
+            // ============================================
+            // FUNÇÃO DE RESTAURAÇÃO DE BACKUP
+            // ============================================
+            const restaurarBackup = async (arquivo) => {
+                try {
+                    const confirmacao = confirm('⚠️ ATENÇÃO: Restaurar backup pode sobrescrever dados atuais!\n\nTem certeza que deseja continuar?');
+                    if (!confirmacao) return;
+
+                    const texto = await arquivo.text();
+                    const dados = JSON.parse(texto);
+                    
+                    let totalRestaurado = 0;
+                    
+                    // Restaurar contribuintes
+                    for (const [chave, valor] of Object.entries(dados)) {
+                        if (chave.startsWith('contribuintes_')) {
+                            const anoRestore = chave.split('_')[1];
+                            for (const [mesNome, dadosMes] of Object.entries(valor)) {
+                                const mesIndex = MESES.indexOf(mesNome);
+                                if (mesIndex !== -1) {
+                                    await db.ref(`contribuintes/${anoRestore}/${mesIndex}`).set(dadosMes);
+                                    totalRestaurado++;
+                                }
+                            }
+                        } else if (chave === 'faltas') {
+                            for (const [periodo, dadosFaltas] of Object.entries(valor)) {
+                                const [anoF, mesF] = periodo.split('_');
+                                await db.ref(`contribuintes/_faltas_${anoF}_${mesF}`).set(dadosFaltas);
+                            }
+                        }
+                    }
+                    
+                    alert(`✅ Backup restaurado com sucesso!\n\n${totalRestaurado} períodos restaurados.\n\nA página será recarregada.`);
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Erro ao restaurar backup:', error);
+                    alert('❌ Erro ao restaurar: ' + error.message);
+                }
+            };
+
+            // ============================================
+            // FUNÇÃO DE FILTROS AVANÇADOS
+            // ============================================
+            const aplicarFiltros = (lista) => {
+                let listaFiltrada = [...lista];
+                
+                // Filtro de busca (nome, documento, inscrição)
+                if (filtros.busca) {
+                    const buscaLower = filtros.busca.toLowerCase();
+                    listaFiltrada = listaFiltrada.filter(item => 
+                        (item.razaoSocial && item.razaoSocial.toLowerCase().includes(buscaLower)) ||
+                        (item.nomeContribuinte && item.nomeContribuinte.toLowerCase().includes(buscaLower)) ||
+                        (item.documento && item.documento.includes(filtros.busca)) ||
+                        (item.inscricaoMunicipal && item.inscricaoMunicipal.includes(filtros.busca))
+                    );
+                }
+                
+                // Filtro por auditor
+                if (filtros.auditor) {
+                    listaFiltrada = listaFiltrada.filter(item => item.auditor === filtros.auditor);
+                }
+                
+                // Filtro por situação
+                if (filtros.situacao) {
+                    listaFiltrada = listaFiltrada.filter(item => item.status === filtros.situacao);
+                }
+                
+                // Filtro por tributação
+                if (filtros.tributacao) {
+                    listaFiltrada = listaFiltrada.filter(item => item.tributacao === filtros.tributacao);
+                }
+                
+                // Apenas verificados
+                if (filtros.apenasVerificados) {
+                    listaFiltrada = listaFiltrada.filter(item => item.verificado);
+                }
+                
+                // Apenas pendentes de lançamento
+                if (filtros.apenasPendentes) {
+                    listaFiltrada = listaFiltrada.filter(item => item.taxasLancadas === 'NAO');
+                }
+                
+                return listaFiltrada;
+            };
+
+            const limparFiltros = () => {
+                setFiltros({
+                    busca: '',
+                    auditor: '',
+                    situacao: '',
+                    tributacao: '',
+                    apenasVerificados: false,
+                    apenasPendentes: false
+                });
+            };
+
             const update = async (id, campo, valor) => {
                 setList(list.map(item =>
                     item.id === id ? { ...item, [campo]: valor } : item
@@ -1134,6 +1297,92 @@
                             </div>
                         </div>
 
+
+                        {/* PAINEL DE FILTROS AVANÇADOS */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow p-4 mb-6 border border-blue-200">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2">
+                                    🔍 Filtros Avançados
+                                </h3>
+                                <button onClick={limparFiltros} className="text-sm px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
+                                    🗑️ Limpar
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">🔎 Busca (Nome/Doc/Insc.)</label>
+                                    <input 
+                                        type="text" 
+                                        value={filtros.busca} 
+                                        onChange={e => setFiltros({...filtros, busca: e.target.value})}
+                                        placeholder="Digite para buscar..."
+                                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">👤 Auditor</label>
+                                    <select 
+                                        value={filtros.auditor} 
+                                        onChange={e => setFiltros({...filtros, auditor: e.target.value})}
+                                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-400"
+                                    >
+                                        <option value="">Todos</option>
+                                        {AUDITORES.map((aud, idx) => <option key={idx} value={aud}>{aud}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">📊 Situação</label>
+                                    <select 
+                                        value={filtros.situacao} 
+                                        onChange={e => setFiltros({...filtros, situacao: e.target.value})}
+                                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-400"
+                                    >
+                                        <option value="">Todas</option>
+                                        <option value="ATIVA">Ativa</option>
+                                        <option value="BAIXADA">Baixada</option>
+                                        <option value="SUSPENSA">Suspensa</option>
+                                        <option value="INAPTA">Inapta</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">💰 Tributação</label>
+                                    <select 
+                                        value={filtros.tributacao} 
+                                        onChange={e => setFiltros({...filtros, tributacao: e.target.value})}
+                                        className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-400"
+                                    >
+                                        <option value="">Todas</option>
+                                        <option value="SIMPLES">Simples</option>
+                                        <option value="EPP">EPP</option>
+                                        <option value="LUCRO PRESUMIDO">L. Presumido</option>
+                                        <option value="LUCRO REAL">L. Real</option>
+                                        <option value="AUTONOMO">Autônomo</option>
+                                        <option value="ISENTO">Isento</option>
+                                        <option value="MEI">MEI</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-4 col-span-full">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={filtros.apenasVerificados}
+                                            onChange={e => setFiltros({...filtros, apenasVerificados: e.target.checked})}
+                                            className="w-4 h-4"
+                                        />
+                                        <span className="text-sm font-medium">✅ Apenas Verificados</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={filtros.apenasPendentes}
+                                            onChange={e => setFiltros({...filtros, apenasPendentes: e.target.checked})}
+                                            className="w-4 h-4"
+                                        />
+                                        <span className="text-sm font-medium">⏳ Apenas Pendentes</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                         <div className="bg-white rounded-lg shadow p-4 mb-6">
                             <div className="flex gap-2 mb-4 border-b overflow-x-auto">
                                 <button onClick={() => setAbaAtiva('principal')} className={`px-4 py-2 font-medium ${abaAtiva === 'principal' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600'}`}>
@@ -1181,6 +1430,15 @@
                                 <button onClick={exportCSV} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
                                     📊 Exportar CSV
                                 </button>
+
+                                <button onClick={fazerBackup} className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+                                    💾 Backup
+                                </button>
+
+                                <label className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded cursor-pointer hover:bg-orange-700">
+                                    <span>📥 Restaurar</span>
+                                    <input type="file" accept=".json" onChange={e => { if (e.target.files[0]) restaurarBackup(e.target.files[0]); }} className="hidden" />
+                                </label>
                             </div>
                         </div>
 
@@ -1251,7 +1509,16 @@
                                     <tbody>
                                         {(() => {
                                             let listaExibir = getSortedList();
+                                            
+                                            // ✅ APLICAR FILTROS AVANÇADOS
+                                            listaExibir = aplicarFiltros(listaExibir);
 
+                                            
+                                            // Mostrar contador de registros filtrados
+                                            const totalFiltrado = listaExibir.length;
+                                            const totalGeral = list.length;
+                                            const filtrosAtivos = filtros.busca || filtros.auditor || filtros.situacao || 
+                                                                  filtros.tributacao || filtros.apenasVerificados || filtros.apenasPendentes;
                                             if (abaAtiva === 'principal') {
                                                 listaExibir = listaExibir.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO');
                                             } else if (abaAtiva === 'mei') {
@@ -1261,7 +1528,7 @@
                                             } else if (abaAtiva === 'visa') {
                                                 listaExibir = listaExibir.filter(l => l.precisaVisa);
                                             } else if (abaAtiva === 'duplicados') {
-                                                listaExibir = getDuplicados();
+                                                listaExibir = aplicarFiltros(getDuplicados());
                                             } else if (abaAtiva === 'Faltas') {
                                                 if (faltas.length === 0) {
                                                     return (
@@ -1453,7 +1720,6 @@
         }
 
         ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
         
         // Converte todos os emojis para Twemoji após renderização
         const observer = new MutationObserver(() => {
@@ -1473,6 +1739,7 @@
             folder: 'svg',
             ext: '.svg'
         }), 100);
+    </script>
 </body>
 
 </html>
