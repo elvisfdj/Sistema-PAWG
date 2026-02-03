@@ -23,7 +23,6 @@ Sistema completo de gestão tributária municipal para controle de licenças, co
 - ✅ Suporte a diferentes regimes tributários
 
 ### 🔍 **Pesquisa e Análise**
-- ✅ Pesquisa de faltas de pagamento por período
 - ✅ Filtros avançados (auditor, situação, tributação)
 - ✅ Busca por nome, documento ou inscrição
 - ✅ Ordenação por colunas
@@ -179,7 +178,7 @@ pawg/
 | Problema | Solução |
 |----------|---------|
 | **Erro de permissão no Firebase** | Verifique as regras do Realtime Database |
-| **Consulta CNPJ não funciona** | API tem limite de 3 consultas/minuto |
+| **Consulta CNPJ não funciona** | API tem limite de 5 consultas/minuto |
 | **Dados não salvam** | Verifique conexão com internet e regras Firebase |
 | **Emojis aparecem diferentes** | Twemoji está carregando? Verifique console |
 
