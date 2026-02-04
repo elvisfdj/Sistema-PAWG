@@ -523,6 +523,8 @@ const ANO_MAXIMO = 2026;
             const [abaAtiva, setAbaAtiva] = useState('principal');
             const [modalInserir, setModalInserir] = useState(false);
             const [formInserir, setFormInserir] = useState({ inscricao: '', documento: '', nome: '' });
+            const [modalInserirFalta, setModalInserirFalta] = useState(false);
+            const [faltaSelecionada, setFaltaSelecionada] = useState(null);
             const [modoVisualizacao, setModoVisualizacao] = useState('mensal');
             const [periodoInicio, setPeriodoInicio] = useState(0);
             const [periodoFim, setPeriodoFim] = useState(11);
@@ -699,28 +701,11 @@ const ANO_MAXIMO = 2026;
             };
 
             const getSortedList = () => {
-                if (!sortConfig.key) return list;
-
+                // ✅ SEMPRE ordenar por inscrição municipal crescente
                 return [...list].sort((a, b) => {
-                    let aVal = a[sortConfig.key] ?? '';
-                    let bVal = b[sortConfig.key] ?? '';
-
-                    if (sortConfig.key === 'verificado') {
-                        aVal = a.verificado ? 1 : 0;
-                        bVal = b.verificado ? 1 : 0;
-                    }
-                    if (sortConfig.key === 'marcador') {
-                        aVal = marcadores[a.id] || '';
-                        bVal = marcadores[b.id] || '';
-                    }
-                    if (sortConfig.key === 'areaM2' || sortConfig.key === 'trimestreAbertura') {
-                        aVal = Number(aVal) || 0;
-                        bVal = Number(bVal) || 0;
-                    }
-
-                    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-                    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-                    return 0;
+                    const inscA = Number(a.inscricaoMunicipal) || 0;
+                    const inscB = Number(b.inscricaoMunicipal) || 0;
+                    return inscA - inscB;
                 });
             };
 
@@ -866,7 +851,7 @@ const ANO_MAXIMO = 2026;
                     } else if (data.company?.size?.text) {
                         const porteText = data.company.size.text.toUpperCase();
                         if (porteText.includes('MICRO')) porte = 'ME';
-                        else if (porteText.includes('PEQUENO')) porte = 'EPP';
+                        else if (porteText.includes('PEQUENO')) porte = 'ME';
                         else porte = 'DEMAIS';
                     }
 
@@ -875,10 +860,10 @@ const ANO_MAXIMO = 2026;
                         tributacao = 'MEI';
                     } else if (porte === 'ME') {
                         tributacao = 'SIMPLES';
-                    } else if (data.company?.simples?.optant && porte === 'EPP') {
+                    } else if (data.company?.simples?.optant && porte === 'DEMAIS') {
                         tributacao = 'SIMPLES';
-                    } else if (porte === 'EPP' && !data.company?.simples?.optant) {
-                        tributacao = 'EPP';
+                    } else if (porte === 'DEMAIS' && !data.company?.simples?.optant) {
+                        tributacao = 'LUCRO PRESUMIDO';
                     } else {
                         tributacao = 'LUCRO PRESUMIDO';
                     }
@@ -991,7 +976,7 @@ const ANO_MAXIMO = 2026;
                 let listaCalculo = list;
 
                 const total = listaCalculo.length;
-                const pendentes = listaCalculo.filter(l => l.taxasLancadas === 'NAO').length;
+                const pendentes = listaCalculo.filter(l => l.taxasLancadas === 'NAO' && l.tributacao !== 'MEI').length;
                 const verificados = listaCalculo.filter(l => l.verificado).length;
 
                 const documentos = {};
@@ -1482,7 +1467,6 @@ const ANO_MAXIMO = 2026;
                                     >
                                         <option value="">Todas</option>
                                         <option value="SIMPLES">Simples</option>
-                                        <option value="EPP">EPP</option>
                                         <option value="LUCRO PRESUMIDO">L. Presumido</option>
                                         <option value="LUCRO REAL">L. Real</option>
                                         <option value="AUTONOMO">Autônomo</option>
@@ -1615,27 +1599,117 @@ const ANO_MAXIMO = 2026;
                                 </div>
                             )}
 
+                            {modalInserirFalta && (
+                                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                                        <h3 className="text-xl font-bold mb-4">➕ Inserir Contribuinte</h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">Inscrição Municipal</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={formInserir.inscricao} 
+                                                    className="w-full px-3 py-2 border rounded bg-gray-100" 
+                                                    placeholder="Opcional"
+                                                    readOnly
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">CPF/CNPJ *</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={formInserir.documento} 
+                                                    onChange={e => setFormInserir({ ...formInserir, documento: e.target.value })} 
+                                                    className="w-full px-3 py-2 border rounded" 
+                                                    required 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium mb-1">Nome/Razão Social *</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={formInserir.nome} 
+                                                    onChange={e => setFormInserir({ ...formInserir, nome: e.target.value })} 
+                                                    className="w-full px-3 py-2 border rounded" 
+                                                    required 
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2 mt-6">
+                                            <button 
+                                                onClick={async () => {
+                                                    if (!formInserir.documento.trim() || !formInserir.nome.trim()) {
+                                                        alert('❌ Preencha pelo menos Documento e Nome!');
+                                                        return;
+                                                    }
+                                                    
+                                                    const clean = formInserir.documento.replace(/\D/g, '');
+                                                    const novo = {
+                                                        inscricaoMunicipal: formInserir.inscricao || '',
+                                                        documento: clean,
+                                                        tipoPessoa: clean.length === 11 ? 'CPF' : 'CNPJ',
+                                                        razaoSocial: formInserir.nome,
+                                                        porte: '',
+                                                        tributacao: clean.length === 11 ? 'AUTONOMO' : '',
+                                                        situacao: '',
+                                                        areaM2: 0,
+                                                        ordemServico: '',
+                                                        nivelISSQN: clean.length === 11 ? 'MEDIO' : 'VARIAVEL',
+                                                        issqnIsento: false,
+                                                        trimestreAbertura: 1,
+                                                        taxasLancadas: 'NAO',
+                                                        verificado: false,
+                                                        precisaVisa: false,
+                                                        criadoEm: Date.now()
+                                                    };
+                                                    
+                                                    await db.ref(`contribuintes/${ano}/${mes}`).push(novo);
+                                                    setFaltas(prev => prev.filter(f => f.inscricaoMunicipal !== formInserir.inscricao));
+                                                    setModalInserirFalta(false);
+                                                    setFaltaSelecionada(null);
+                                                    setFormInserir({ inscricao: '', documento: '', nome: '' });
+                                                    alert('✅ Contribuinte inserido com sucesso!');
+                                                }} 
+                                                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                                            >
+                                                ✓ Confirmar
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    setModalInserirFalta(false); 
+                                                    setFaltaSelecionada(null);
+                                                    setFormInserir({ inscricao: '', documento: '', nome: '' }); 
+                                                }} 
+                                                className="flex-1 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                                            >
+                                                ✗ Cancelar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead className="bg-indigo-600 text-white">
                                         <tr>
-                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('verificado')}>
-                                                Status {sortConfig.key === 'verificado' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            <th className="px-3 py-2 text-left " >
+                                                Status 
                                             </th>
-                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('marcador')}>
-                                                Cor {sortConfig.key === 'marcador' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            <th className="px-3 py-2 text-left " >
+                                                Cor 
                                             </th>
-                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('inscricaoMunicipal')}>
-                                                Inscrição {sortConfig.key === 'inscricaoMunicipal' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            <th className="px-3 py-2 text-left " >
+                                                Inscrição 
                                             </th>
-                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('documento')}>
-                                                Documento {sortConfig.key === 'documento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            <th className="px-3 py-2 text-left " >
+                                                Documento 
                                             </th>
-                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('razaoSocial')}>
-                                                Nome {sortConfig.key === 'razaoSocial' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            <th className="px-3 py-2 text-left " >
+                                                Identificação do Contribuinte 
                                             </th>
-                                            <th className="px-3 py-2 text-left cursor-pointer" onClick={() => requestSort('situacao')}>
-                                                Situação {sortConfig.key === 'situacao' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            <th className="px-3 py-2 text-left " >
+                                                Situação 
                                             </th>
                                             <th className="px-3 py-2">Porte</th>
                                             <th className="px-3 py-2">Tributação</th>
@@ -1706,8 +1780,22 @@ const ANO_MAXIMO = 2026;
                                                         <td className="px-3 py-2 text-right">-</td>
                                                         <td className="px-3 py-2 text-right">-</td>
                                                         <td className="px-3 py-2">-</td>
-                                                        <td className="px-3 py-2 text-sm text-gray-600">{falta.status}</td>
-                                                        <td className="px-3 py-2 text-center">-</td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setFaltaSelecionada(falta);
+                                                                    setFormInserir({
+                                                                        inscricao: falta.inscricaoMunicipal || '',
+                                                                        documento: falta.documento || '',
+                                                                        nome: falta.razaoSocial !== 'Não encontrado' ? falta.razaoSocial : ''
+                                                                    });
+                                                                    setModalInserirFalta(true);
+                                                                }}
+                                                                className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                                                            >
+                                                                ➕
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ));
                                             }
@@ -1795,7 +1883,6 @@ const ANO_MAXIMO = 2026;
                                                                 <option value="">-</option>
                                                                 <option value="MEI">MEI</option>
                                                                 <option value="ME">ME</option>
-                                                                <option value="EPP">EPP</option>
                                                                 <option value="DEMAIS">DEMAIS</option>
                                                             </select>
                                                         </td>
@@ -1803,7 +1890,6 @@ const ANO_MAXIMO = 2026;
                                                             <select value={l.tributacao || ''} onChange={e => update(l.id, 'tributacao', e.target.value)} className="px-2 py-1 border rounded bg-white text-xs">
                                                                 <option value="">Selecione</option>
                                                                 <option value="SIMPLES">Simples</option>
-                                                                <option value="EPP">EPP</option>
                                                                 <option value="LUCRO PRESUMIDO">L. Presumido</option>
                                                                 <option value="LUCRO REAL">L. Real</option>
                                                                 <option value="AUTONOMO">Autônomo</option>
@@ -1827,12 +1913,16 @@ const ANO_MAXIMO = 2026;
                                                             </select>
                                                         </td>
                                                         <td className="px-3 py-2">
-                                                            <select value={l.trimestreAbertura || 1} onChange={e => update(l.id, 'trimestreAbertura', Number(e.target.value))} className="px-2 py-1 border rounded text-xs bg-white">
-                                                                <option value={1}>1°</option>
-                                                                <option value={2}>2°</option>
-                                                                <option value={3}>3°</option>
-                                                                <option value={4}>4°</option>
-                                                            </select>
+                                                            {l.tipoPessoa === 'CNPJ' ? (
+                                                                <span className="text-center text-gray-500">-</span>
+                                                            ) : (
+                                                                <select value={l.trimestreAbertura || 1} onChange={e => update(l.id, 'trimestreAbertura', Number(e.target.value))} className="px-2 py-1 border rounded text-xs bg-white">
+                                                                    <option value={1}>1°</option>
+                                                                    <option value={2}>2°</option>
+                                                                    <option value={3}>3°</option>
+                                                                    <option value={4}>4°</option>
+                                                                </select>
+                                                            )}
                                                         </td>
                                                         <td className="px-3 py-2">
                                                             <select value={l.nivelISSQN} onChange={e => update(l.id, 'nivelISSQN', e.target.value)} className="px-2 py-1 border rounded text-xs" disabled={l.tipoPessoa === 'CNPJ'}>
@@ -1894,13 +1984,3 @@ const ANO_MAXIMO = 2026;
 </body>
 
 </html>
-
-
-
-
-
-
-
-
-
-
