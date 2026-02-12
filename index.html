@@ -991,77 +991,20 @@
                     }
 
                     let data = null;
-                    let apiUsada = '';
 
-                    // ✅ TENTATIVA 1: open.cnpja.com
-                    try {
-                        const url1 = `https://open.cnpja.com/office/${cnpj}`;
-                        console.log('📡 API 1: Tentando open.cnpja.com...');
+                    // 📡 CONSULTAR APENAS open.cnpja.com
+                    const url = `https://open.cnpja.com/office/${cnpj}`;
+                    console.log('📡 Consultando open.cnpja.com...');
 
-                        const response1 = await fetch(url1);
-                        console.log('📥 Response status:', response1.status, response1.statusText);
+                    const response = await fetch(url);
+                    console.log('📥 Response status:', response.status, response.statusText);
 
-                        if (response1.ok) {
-                            data = await response1.json();
-                            apiUsada = 'open.cnpja.com';
-                            console.log('✅ Dados recebidos de open.cnpja.com:', data);
-                        } else {
-                            const errorText = await response1.text();
-                            console.warn('⚠️ open.cnpja.com falhou:', errorText);
-                            throw new Error('API 1 falhou, tentando fallback...');
-                        }
-                    } catch (error1) {
-                        console.log('🔄 Tentando API alternativa (ReceitaWS)...');
-
-                        // ✅ TENTATIVA 2: receitaws.com.br
-                        try {
-                            const url2 = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;
-                            console.log('📡 API 2: Tentando receitaws.com.br...');
-
-                            const response2 = await fetch(url2);
-
-                            if (!response2.ok) {
-                                throw new Error(`ReceitaWS retornou: ${response2.status}`);
-                            }
-
-                            const dataRWS = await response2.json();
-                            console.log('✅ Dados recebidos de ReceitaWS:', dataRWS);
-
-                            if (dataRWS.status === 'ERROR') {
-                                throw new Error(dataRWS.message || 'CNPJ não encontrado');
-                            }
-
-                            // Converter formato ReceitaWS para formato open.cnpja
-                            data = {
-                                company: {
-                                    size: {
-                                        text: dataRWS.porte || ''
-                                    },
-                                    simei: {
-                                        optant: dataRWS.simei === true
-                                    },
-                                    simples: {
-                                        optant: dataRWS.simples?.optante === true
-                                    }
-                                },
-                                status: {
-                                    text: dataRWS.situacao || ''
-                                },
-                                mainActivity: {
-                                    id: dataRWS.atividade_principal?.[0]?.code
-                                },
-                                sideActivities: dataRWS.atividades_secundarias || []
-                            };
-
-                            apiUsada = 'receitaws.com.br';
-                        } catch (error2) {
-                            console.error('❌ Ambas APIs falharam!');
-                            alert(`❌ CNPJ não encontrado em nenhuma API!\n\nVerifique:\n1. CNPJ está correto?\n2. CNPJ é muito novo? (cadastrado hoje/ontem)\n3. CNPJ está ativo na Receita?\n\n💡 Dica: Preencha manualmente os dados.`);
-                            return { success: false, error: 'CNPJ não encontrado' };
-                        }
+                    if (!response.ok) {
+                        throw new Error(`API retornou status ${response.status}`);
                     }
 
-                    console.log('🎯 API usada:', apiUsada);
+                    data = await response.json();
+                    console.log('✅ Dados recebidos de open.cnpja.com:', data);
 
                     // Processar dados (mesma lógica)
                     let porte = '';
@@ -1118,7 +1061,7 @@
                     setConsultasRealizadas(prev => prev + 1);
                     setUltimaConsulta(new Date());
 
-                    console.log('✅ Consulta concluída com sucesso via', apiUsada);
+                    console.log('✅ Consulta concluída com sucesso');
                     return { success: true, porte, tributacao, situacao };
                 } catch (error) {
                     console.error('❌ ERRO GERAL:', error);
@@ -1522,52 +1465,154 @@
             };
 
             const rodarReprocessamento = async () => {
-                if (!confirm('Confirma o reprocessamento?')) return;
+                if (!confirm('⚠️ ATENÇÃO!\n\nO reprocessamento irá RECONSULTAR a API para cada contribuinte.\n\nIsso levará MUITO TEMPO devido ao delay de 12 segundos entre cada consulta.\n\nExemplo: 100 contribuintes = ~20 minutos\n\nDeseja continuar?')) {
+                    return;
+                }
+
                 setRodando(true);
+
                 try {
-                    let n = 0;
-                    const verificados = list.filter(x => x.verificado && x.dadosAPI);
+                    // Filtrar contribuintes
+                    let listaParaReprocessar = [];
 
-                    for (const c of verificados) {
-                        const u = {}, a = c.dadosAPI;
-
-                        // VISA: verifica CNAE principal + secundários
-                        if (opcoesReproc.visa) {
-                            const cns = [];
-                            if (a.mainActivity?.id) cns.push(String(a.mainActivity.id).substring(0, 4));
-                            if (a.sideActivities) a.sideActivities.forEach(s => {
-                                if (s.id || s.code) cns.push(String(s.id || s.code).substring(0, 4));
-                            });
-                            u.precisaVisa = cns.some(z => CNAES_VISA.includes(z));
-                        }
-
-                        // PORTE
-                        if (opcoesReproc.porte) {
-                            let p = '';
-                            if (a.company?.size?.acronym) p = a.company.size.acronym;
-                            else if (a.company?.size?.text) {
-                                const txt = a.company.size.text.toUpperCase();
-                                p = txt.includes('MICRO') || txt.includes('PEQUENO') ? 'ME' : 'DEMAIS';
-                            }
-                            u.porte = p;
-                        }
-
-                        // TRIBUTAÇÃO
-                        if (opcoesReproc.trib) {
-                            const pt = u.porte || c.porte;
-                            u.tributacao = a.company?.simei?.optant ? 'MEI' : pt === 'ME' ? 'SIMPLES' : a.company?.simples?.optant ? 'SIMPLES' : 'LUCRO PRESUMIDO';
-                        }
-
-                        // Atualizar Firebase + lista local
-                        await db.ref(`contribuintes/${ano}/${mes}/${c.id}`).update(u);
-                        setList(p => p.map(i => i.id === c.id ? { ...i, ...u } : i));
-                        n++;
+                    if (opcoesReproc.visa || opcoesReproc.porte || opcoesReproc.trib) {
+                        // Se marcou ALGUMA opção, só reprocessa os verificados
+                        listaParaReprocessar = list.filter(x => x.verificado && x.documento);
+                    } else {
+                        alert('⚠️ Marque pelo menos uma opção: VISA, Porte ou Tributação');
+                        setRodando(false);
+                        return;
                     }
 
-                    alert(`✅ ${n} contribuintes reprocessados!`);
+                    if (listaParaReprocessar.length === 0) {
+                        alert('ℹ️ Nenhum contribuinte verificado encontrado para reprocessar.');
+                        setRodando(false);
+                        return;
+                    }
+
+                    console.log(`🔄 Iniciando reprocessamento de ${listaParaReprocessar.length} contribuintes...`);
+
+                    let sucessos = 0;
+                    let erros = 0;
+
+                    for (let i = 0; i < listaParaReprocessar.length; i++) {
+                        const c = listaParaReprocessar[i];
+                        const cnpj = c.documento.replace(/\D/g, ''); // Remove formatação
+
+                        console.log(`🔄 [${i + 1}/${listaParaReprocessar.length}] Reprocessando: ${c.razaoSocial} (${cnpj})`);
+
+                        try {
+                            // ⏳ RESPEITAR DELAY DE 12 SEGUNDOS
+                            if (ultimaConsulta) {
+                                const tempoDecorrido = Date.now() - ultimaConsulta.getTime();
+                                if (tempoDecorrido < 12000) {
+                                    const espera = 12000 - tempoDecorrido;
+                                    console.log(`⏳ Aguardando ${espera}ms antes de consultar...`);
+                                    await new Promise(resolve => setTimeout(resolve, espera));
+                                }
+                            }
+
+                            // 📡 CONSULTAR API (APENAS open.cnpja.com)
+                            const url = `https://open.cnpja.com/office/${cnpj}`;
+                            console.log('📡 Consultando open.cnpja.com...');
+
+                            const response = await fetch(url);
+
+                            if (!response.ok) {
+                                throw new Error(`API retornou status ${response.status}`);
+                            }
+
+                            const data = await response.json();
+                            console.log('✅ Dados recebidos de open.cnpja.com');
+
+                            // 🔄 PROCESSAR DADOS
+                            const u = { dadosAPI: data };
+
+                            // PORTE
+                            if (opcoesReproc.porte) {
+                                let p = '';
+                                if (data.company?.size?.acronym) {
+                                    p = data.company.size.acronym;
+                                } else if (data.company?.size?.text) {
+                                    const txt = data.company.size.text.toUpperCase();
+                                    p = txt.includes('MICRO') || txt.includes('PEQUENO') ? 'ME' : 'DEMAIS';
+                                }
+                                u.porte = p;
+                            }
+
+                            // TRIBUTAÇÃO
+                            if (opcoesReproc.trib) {
+                                let trib = '';
+                                const porteAtual = u.porte || c.porte;
+
+                                if (data.company?.simei?.optant) {
+                                    trib = 'MEI';
+                                } else if (porteAtual === 'ME') {
+                                    trib = 'SIMPLES';
+                                } else if (data.company?.simples?.optant && porteAtual === 'DEMAIS') {
+                                    trib = 'SIMPLES';
+                                } else if (porteAtual === 'DEMAIS' && !data.company?.simples?.optant) {
+                                    trib = 'LUCRO PRESUMIDO';
+                                } else {
+                                    trib = 'LUCRO PRESUMIDO';
+                                }
+
+                                u.tributacao = trib;
+                            }
+
+                            // VISA
+                            if (opcoesReproc.visa) {
+                                const cnaes = [];
+
+                                // CNAE Principal
+                                if (data.mainActivity?.id) {
+                                    cnaes.push(String(data.mainActivity.id).substring(0, 4));
+                                }
+
+                                // CNAEs Secundários
+                                if (data.sideActivities) {
+                                    data.sideActivities.forEach(s => {
+                                        if (s.id || s.code) {
+                                            cnaes.push(String(s.id || s.code).substring(0, 4));
+                                        }
+                                    });
+                                }
+
+                                u.precisaVisa = cnaes.some(z => CNAES_VISA.includes(z));
+                            }
+
+                            // SITUAÇÃO (SEMPRE atualiza)
+                            u.situacao = data.status?.text || '';
+
+                            // ✅ Marcar como verificado
+                            u.verificado = true;
+
+                            // 💾 ATUALIZAR FIREBASE + LISTA LOCAL
+                            await db.ref(`contribuintes/${ano}/${mes}/${c.id}`).update(u);
+                            setList(prevList => prevList.map(item =>
+                                item.id === c.id ? { ...item, ...u } : item
+                            ));
+
+                            // ✅ Atualizar contadores
+                            setConsultasRealizadas(prev => prev + 1);
+                            setUltimaConsulta(new Date());
+
+                            sucessos++;
+                            console.log(`✅ [${i + 1}/${listaParaReprocessar.length}] Reprocessado com sucesso`);
+
+                        } catch (error) {
+                            console.error(`❌ Erro ao reprocessar ${cnpj}:`, error);
+                            erros++;
+                        }
+                    }
+
+                    // 🎉 CONCLUÍDO
+                    alert(`✅ Reprocessamento concluído!\n\n✅ Sucessos: ${sucessos}\n❌ Erros: ${erros}\n📊 Total: ${listaParaReprocessar.length}`);
                     setModalReprocessar(false);
+
                 } catch (e) {
-                    alert('Erro: ' + e.message);
+                    console.error('❌ ERRO GERAL:', e);
+                    alert('Erro no reprocessamento: ' + e.message);
                 } finally {
                     setRodando(false);
                 }
