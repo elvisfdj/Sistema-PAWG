@@ -2246,8 +2246,8 @@
                                                         <td className="px-3 py-2">
                                                             <select value={l.porte || ''} onChange={e => update(l.id, 'porte', e.target.value)} className="px-2 py-1 border rounded bg-white text-xs" disabled={l.tipoPessoa === 'CPF'}>
                                                                 <option value="">-</option>
-                                                                <option value="MEI">MEI</option>
                                                                 <option value="ME">ME</option>
+                                                                <option value="EPP">EPP</option>
                                                                 <option value="DEMAIS">DEMAIS</option>
                                                             </select>
                                                         </td>
@@ -2437,5 +2437,6 @@
         }), 100);
     </script>
 </body>
+
 
 </html>
