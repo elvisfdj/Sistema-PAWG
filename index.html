@@ -697,6 +697,14 @@
             const [opcoesReproc, setOpcoesReproc] = useState({ visa: true, porte: true, trib: true });
             const [rodando, setRodando] = useState(false);
 
+            // PROGRESSO
+            const [processando, setProcessando] = useState(false);
+            const [processoTitulo, setProcessoTitulo] = useState('');
+            const [processoAtual, setProcessoAtual] = useState(0);
+            const [processoTotal, setProcessoTotal] = useState(0);
+            const [processoItemAtual, setProcessoItemAtual] = useState('');
+            const [processoTempoEstimado, setProcessoTempoEstimado] = useState('');
+
             const valorUficaAtual = valorUfica[ano] || VALOR_UFICA_2026;
 
             useEffect(() => {
@@ -1000,6 +1008,10 @@
                     console.log('📥 Response status:', response.status, response.statusText);
 
                     if (!response.ok) {
+                        if (response.status === 404) {
+                            console.warn(`⚠️ CNPJ ${cnpj} não encontrado na API (404). Ignorando.`);
+                            return { success: false, error: 'CNPJ não encontrado (404)' };
+                        }
                         throw new Error(`API retornou status ${response.status}`);
                     }
 
@@ -1075,22 +1087,51 @@
                 const naoConsultados = list.filter(l => !l.verificado && l.tipoPessoa === 'CNPJ');
 
                 if (naoConsultados.length === 0) {
-                    alert('Todos os CNPJs já foram consultados!');
+                    alert('✅ Todos os CNPJs já foram consultados!');
                     return;
                 }
 
-                setConsultandoQueue(naoConsultados.map(l => l.id));
-
-                for (let i = 0; i < naoConsultados.length; i++) {
-                    const item = naoConsultados[i];
-                    await consultarCNPJ(item.documento, item.id);
-                    if (i < naoConsultados.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 12000));
-                    }
+                if (!confirm(`🔍 Consultar ${naoConsultados.length} CNPJs?\n\n⏱️ Tempo estimado: ~${Math.ceil(naoConsultados.length * 12 / 60)} minutos\n\n⚠️ Delay de 12 segundos entre consultas.`)) {
+                    return;
                 }
 
-                setConsultandoQueue([]);
-                alert(`✅ ${naoConsultados.length} CNPJs consultados!`);
+                // ✅ ATIVAR CONTADOR
+                setProcessando(true);
+                setProcessoTitulo('🔍 Consultando CNPJs');
+                setProcessoTotal(naoConsultados.length);
+                setProcessoAtual(0);
+
+                const tempoEstimadoMin = Math.ceil(naoConsultados.length * 12 / 60);
+                setProcessoTempoEstimado(`~${tempoEstimadoMin} minutos`);
+                setConsultandoQueue(naoConsultados.map(l => l.id));
+
+                try {
+                    for (let i = 0; i < naoConsultados.length; i++) {
+                        const item = naoConsultados[i];
+
+                        // ✅ ATUALIZAR CONTADOR
+                        setProcessoAtual(i + 1);
+                        setProcessoItemAtual(`${item.razaoSocial || item.documento}`);
+
+                        await consultarCNPJ(item.documento, item.id);
+                        if (i < naoConsultados.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 12000));
+                        }
+                    }
+
+                    alert(`✅ Consulta concluída!\n\n${naoConsultados.length} CNPJs consultados.`);
+                } catch (error) {
+                    console.error('❌ Erro na consulta em lote:', error);
+                    alert('Erro: ' + error.message);
+                } finally {
+                    setConsultandoQueue([]);
+                    // ✅ DESATIVAR CONTADOR
+                    setProcessando(false);
+                    setProcessoAtual(0);
+                    setProcessoTotal(0);
+                    setProcessoItemAtual('');
+                    setProcessoTempoEstimado('');
+                }
             };
 
             const toggleMarcador = async (id, cor) => {
@@ -1209,52 +1250,88 @@
                 alert('✅ Contribuinte adicionado!');
             };
 
-            const importarTXT = (file) => {
+            const importarTXT = (event) => {
+                const file = event.target ? event.target.files[0] : event; // Adaptação para aceitar event ou file direto
                 if (!file) return;
 
                 const reader = new FileReader();
                 reader.onload = async (e) => {
-                    const linhas = e.target.result.split('\n');
-                    let novos = 0;
-                    let ignorados = 0;
+                    try {
+                        const texto = e.target.result;
+                        const linhas = texto.split('\n').filter(l => l.trim());
 
-                    const docsVerificados = new Set(list.filter(l => l.verificado).map(l => l.documento));
-
-                    for (const l of linhas) {
-                        if (!l.trim()) continue;
-
-                        const partes = l.split('\t').map(p => p.trim());
-                        const [insc, doc, nome] = partes;
-
-                        if (!doc) continue;
-
-                        const clean = doc.replace(/\D/g, '');
-
-                        if (docsVerificados.has(clean)) {
-                            ignorados++;
-                            continue;
+                        if (linhas.length === 0) {
+                            alert('❌ Arquivo vazio!');
+                            return;
                         }
 
-                        const contribuinte = {
-                            inscricaoMunicipal: insc || '',
-                            documento: clean,
-                            tipoPessoa: clean.length === 11 ? 'CPF' : 'CNPJ',
-                            razaoSocial: nome || '',
-                            porte: '',
-                            areaM2: 0,
-                            nivelISSQN: 'MEDIO',
-                            issqnIsento: false,
-                            trimestreAbertura: 1,
-                            taxasLancadas: 'NAO',
-                            verificado: false,
-                            criadoEm: Date.now()
-                        };
+                        if (!confirm(`📁 Importar ${linhas.length} linhas?`)) {
+                            return;
+                        }
 
-                        await salvarNoFirebase(contribuinte);
-                        novos++;
+                        // ✅ ATIVAR CONTADOR
+                        setProcessando(true);
+                        setProcessoTitulo('📁 Importando Arquivo TXT');
+                        setProcessoTotal(linhas.length);
+                        setProcessoAtual(0);
+
+                        let novos = 0;
+                        let ignorados = 0;
+                        const docsVerificados = new Set(list.filter(l => l.verificado).map(l => l.documento));
+
+                        for (let i = 0; i < linhas.length; i++) {
+                            const l = linhas[i];
+
+                            // ✅ ATUALIZAR CONTADOR
+                            setProcessoAtual(i + 1);
+                            setProcessoItemAtual(`Processando linha ${i + 1}...`);
+
+                            // Pequeno delay para renderizar UI
+                            await new Promise(r => setTimeout(r, 0));
+
+                            const partes = l.split('\t').map(p => p.trim());
+                            const [insc, doc, nome] = partes;
+
+                            if (!doc) continue;
+
+                            const clean = doc.replace(/\D/g, '');
+
+                            if (docsVerificados.has(clean)) {
+                                ignorados++;
+                                continue;
+                            }
+
+                            const contribuinte = {
+                                inscricaoMunicipal: insc || '',
+                                documento: clean,
+                                tipoPessoa: clean.length === 11 ? 'CPF' : 'CNPJ',
+                                razaoSocial: nome || '',
+                                porte: '',
+                                areaM2: 0,
+                                nivelISSQN: 'MEDIO',
+                                issqnIsento: false,
+                                trimestreAbertura: 1,
+                                taxasLancadas: 'NAO',
+                                verificado: false,
+                                criadoEm: Date.now()
+                            };
+
+                            await salvarNoFirebase(contribuinte);
+                            novos++;
+                        }
+
+                        alert(`✅ ${novos} contribuintes importados!\n⏭️ ${ignorados} já verificados foram ignorados.`);
+                    } catch (error) {
+                        console.error('❌ Erro ao importar:', error);
+                        alert('Erro ao importar: ' + error.message);
+                    } finally {
+                        // ✅ DESATIVAR CONTADOR
+                        setProcessando(false);
+                        setProcessoAtual(0);
+                        setProcessoTotal(0);
+                        setProcessoItemAtual('');
+                        if (event.target) event.target.value = ''; // Limpar input se for evento
                     }
-
-                    alert(`✅ ${novos} contribuintes importados!\n⏭️ ${ignorados} já verificados foram ignorados.`);
                 };
 
                 reader.readAsText(file);
@@ -1465,31 +1542,36 @@
             };
 
             const rodarReprocessamento = async () => {
-                if (!confirm('⚠️ ATENÇÃO!\n\nO reprocessamento irá RECONSULTAR a API para cada contribuinte.\n\nIsso levará MUITO TEMPO devido ao delay de 12 segundos entre cada consulta.\n\nExemplo: 100 contribuintes = ~20 minutos\n\nDeseja continuar?')) {
+                // Filtrar contribuintes PRELIMINARMENTE
+                let listaParaReprocessar = [];
+                if (opcoesReproc.visa || opcoesReproc.porte || opcoesReproc.trib) {
+                    listaParaReprocessar = list.filter(x => x.verificado && x.documento);
+                } else {
+                    alert('⚠️ Marque pelo menos uma opção: VISA, Porte ou Tributação');
+                    return;
+                }
+
+                if (listaParaReprocessar.length === 0) {
+                    alert('ℹ️ Nenhum contribuinte verificado encontrado para reprocessar.');
+                    return;
+                }
+
+                if (!confirm(`⚠️ ATENÇÃO!\n\nReprocessar ${listaParaReprocessar.length} contribuintes?\n\nIsso levará MUITO TEMPO devido ao delay de 12 segundos entre cada consulta.\n\nTempo estimado: ~${Math.ceil(listaParaReprocessar.length * 12 / 60)} minutos\n\nDeseja continuar?`)) {
                     return;
                 }
 
                 setRodando(true);
 
+                // ✅ ATIVAR CONTADOR
+                setProcessando(true);
+                setProcessoTitulo('⚙️ Reprocessando Contribuintes');
+                setProcessoTotal(listaParaReprocessar.length);
+                setProcessoAtual(0);
+
+                const tempoEstimadoMin = Math.ceil(listaParaReprocessar.length * 12 / 60);
+                setProcessoTempoEstimado(`~${tempoEstimadoMin} minutos`);
+
                 try {
-                    // Filtrar contribuintes
-                    let listaParaReprocessar = [];
-
-                    if (opcoesReproc.visa || opcoesReproc.porte || opcoesReproc.trib) {
-                        // Se marcou ALGUMA opção, só reprocessa os verificados
-                        listaParaReprocessar = list.filter(x => x.verificado && x.documento);
-                    } else {
-                        alert('⚠️ Marque pelo menos uma opção: VISA, Porte ou Tributação');
-                        setRodando(false);
-                        return;
-                    }
-
-                    if (listaParaReprocessar.length === 0) {
-                        alert('ℹ️ Nenhum contribuinte verificado encontrado para reprocessar.');
-                        setRodando(false);
-                        return;
-                    }
-
                     console.log(`🔄 Iniciando reprocessamento de ${listaParaReprocessar.length} contribuintes...`);
 
                     let sucessos = 0;
@@ -1498,6 +1580,10 @@
                     for (let i = 0; i < listaParaReprocessar.length; i++) {
                         const c = listaParaReprocessar[i];
                         const cnpj = c.documento.replace(/\D/g, ''); // Remove formatação
+
+                        // ✅ ATUALIZAR CONTADOR
+                        setProcessoAtual(i + 1);
+                        setProcessoItemAtual(`${c.razaoSocial || c.documento}`);
 
                         console.log(`🔄 [${i + 1}/${listaParaReprocessar.length}] Reprocessando: ${c.razaoSocial} (${cnpj})`);
 
@@ -1615,6 +1701,13 @@
                     alert('Erro no reprocessamento: ' + e.message);
                 } finally {
                     setRodando(false);
+                    // ✅ DESATIVAR CONTADOR
+                    setProcessando(false);
+                    setProcessoAtual(0);
+                    setProcessoTotal(0);
+                    setProcessoItemAtual('');
+                    setProcessoTempoEstimado('');
+                    setModalReprocessar(false);
                 }
             };
 
@@ -2265,6 +2358,45 @@
                                     >
                                         ✗ Cancelar
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* OVERLAY DE PROGRESSO */}
+                    {processando && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg p-8 max-w-md w-full shadow-2xl">
+                                <div className="text-center">
+                                    <div className="text-2xl mb-4">⚙️</div>
+                                    <h3 className="text-xl font-bold mb-4">{processoTitulo}</h3>
+
+                                    <div className="text-4xl font-bold text-blue-600 mb-2">
+                                        {processoAtual} de {processoTotal}
+                                    </div>
+
+                                    <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
+                                        <div
+                                            className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+                                            style={{ width: `${(processoAtual / processoTotal) * 100}%` }}
+                                        ></div>
+                                    </div>
+
+                                    <div className="text-lg text-gray-600 mb-4">
+                                        {((processoAtual / processoTotal) * 100).toFixed(0)}% concluído
+                                    </div>
+
+                                    {processoItemAtual && (
+                                        <div className="text-sm text-gray-500 truncate">
+                                            {processoItemAtual}
+                                        </div>
+                                    )}
+
+                                    {processoTempoEstimado && (
+                                        <div className="text-xs text-gray-400 mt-2">
+                                            Tempo estimado: {processoTempoEstimado}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
