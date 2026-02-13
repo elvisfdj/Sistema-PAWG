@@ -1605,6 +1605,11 @@
                             const response = await fetch(url);
 
                             if (!response.ok) {
+                                if (response.status === 404) {
+                                    console.warn(`⚠️ CNPJ ${cnpj} não encontrado na API (404). Ignorando.`);
+                                    erros++;
+                                    continue;
+                                }
                                 throw new Error(`API retornou status ${response.status}`);
                             }
 
