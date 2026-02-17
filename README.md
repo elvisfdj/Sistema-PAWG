@@ -1,101 +1,113 @@
 # 💻 PAWG – Portal de Administração e Workflow de Guias
 
-Sistema completo de gestão tributária municipal para controle de licenças, contribuintes e arrecadação.
+Sistema web completo para gestão de contribuintes, lançamento de taxas municipais (TFLF, ISSQN, VISA) e controle de documentos administrativos.
 
-![Status](https://img.shields.io/badge/status-ativo-brightgreen) ![Versão](https://img.shields.io/badge/vers%C3%A3o-2.0-blue) ![Firebase](https://img.shields.io/badge/Firebase-Realtime%20DB-orange)
-
----
-
-## 🎯 **Funcionalidades Principais**
-
-### 📋 **Gestão de Contribuintes**
-- ✅ Cadastro de CNPJ e CPF
-- ✅ Consulta automática de CNPJ via API CNPJA
-- ✅ Importação em massa via arquivo TXT
-- ✅ Detecção automática de duplicidades
-- ✅ Marcadores coloridos para organização
-
-### 💰 **Cálculos Tributários Automáticos**
-- ✅ TFLF (Taxa de Fiscalização de Licença e Funcionamento)
-- ✅ ISSQN (Imposto Sobre Serviços)
-- ✅ Taxa de Vigilância Sanitária (VISA)
-- ✅ Tabela progressiva baseada em área (m²)
-- ✅ Suporte a diferentes regimes tributários
-
-### 🔍 **Pesquisa e Análise**
-- ✅ Filtros avançados (auditor, situação, tributação)
-- ✅ Busca por nome, documento ou inscrição
-- ✅ Ordenação por colunas
-- ✅ Visualização por abas (Principal, MEI, Autônomo, VISA)
-
-### 💾 **Backup e Exportação**
-- ✅ Backup completo em JSON
-- ✅ Restauração de backup
-- ✅ Exportação para CSV
-- ✅ Todos os dados locais (sem custos Firebase)
-
-### 📊 **Dashboard e Estatísticas**
-- ✅ Total de contribuintes
-- ✅ Pendentes de lançamento
-- ✅ CNPJs verificados
-- ✅ Arrecadação total (TFLF, ISSQN, VISA)
-- ✅ Documentos duplicados
+![Status](https://img.shields.io/badge/status-ativo-success)
+![Versão](https://img.shields.io/badge/versão-2.0-blue)
+![Licença](https://img.shields.io/badge/licença-MIT-green)
 
 ---
 
-## 🚀 **Tecnologias Utilizadas**
+## 📋 Sobre o Sistema
 
-| Tecnologia | Descrição |
-|-----------|-----------|
-| **React 18** | Interface responsiva e interativa |
-| **Firebase Realtime Database** | Banco de dados em tempo real |
-| **Firebase Authentication** | Autenticação segura de usuários |
-| **TailwindCSS** | Estilização moderna e responsiva |
-| **API CNPJA** | Consulta automática de dados empresariais |
-| **Twemoji** | Emojis consistentes em todos os sistemas |
+O **PAWG** é uma solução desenvolvida para automatizar e otimizar processos de fiscalização tributária municipal, oferecendo:
+
+- 📊 **Gestão de Contribuintes**: Cadastro, importação em lote e consulta automatizada via API CNPJ
+- 💰 **Cálculo de Taxas**: TFLF (Taxa de Fiscalização e Localização), ISSQN (Imposto Sobre Serviços) e Vigilância Sanitária
+- 🏥 **Classificação VISA**: Identificação automática de CNAEs sujeitos à vigilância sanitária
+- 📁 **Controle Documental**: Gestão de editais, ofícios, memorandos e outros documentos
+- 📈 **Dashboards**: Indicadores em tempo real de arrecadação, pendências e duplicidades
+- 🔄 **Reprocessamento**: Atualização em lote de dados via API
 
 ---
 
-## ⚙️ **Configuração e Instalação**
+## ✨ Principais Funcionalidades
 
-### 1️⃣ **Clone o Repositório**
+### 🎯 Módulo Contribuintes
+
+- ✅ **Importação TXT**: Upload de arquivos com múltiplos contribuintes
+- 🔍 **Consulta CNPJ Automática**: Integração com API open.cnpja.com
+- 🏢 **Classificação Inteligente**:
+  - Porte (ME/EPP/DEMAIS)
+  - Tributação (MEI/SIMPLES/LUCRO PRESUMIDO/AUTÔNOMO)
+  - Necessidade de licença VISA (baseada em CNAEs)
+- 📋 **Gestão Individual**: Inserção manual, edição inline e exclusão
+- 🔄 **Reprocessamento em Lote**: Atualização de dados de CNPJs verificados
+- 🎨 **Marcadores Coloridos**: Organização visual por status
+- 📊 **Filtros Avançados**: Busca por nome, documento, auditor, situação
+- 📥 **Exportação CSV**: Relatórios completos para análise externa
+
+### 💵 Cálculo de Taxas
+
+**TFLF (Taxa de Fiscalização)**
+- Cálculo automático por porte e tributação
+- Base: UFICAs (Unidade Fiscal de Campos)
+- Configuração de valor UFICA por ano
+
+**ISSQN (Imposto Sobre Serviços)**
+- Apenas para Autônomos (CPF)
+- Níveis: Médio ou Superior
+- Proporcional ao trimestre de abertura
+
+**VISA (Vigilância Sanitária)**
+- Tabela progressiva por área (m²)
+- Redução de 50% para ME/EPP no Simples
+- Identificação automática via CNAE
+
+### 📂 Módulo Documentos
+
+- 📋 Tipos: Editais, Ofícios, Memorandos, Atas
+- 🔢 Numeração automática por tipo/ano
+- 🔍 Filtros por tipo, setor, data
+- ✏️ Edição inline de todos os campos
+- 🗑️ Exclusão com confirmação
+
+### 🔐 Segurança e Autenticação
+
+- 🔒 Firebase Authentication
+- 👥 Login por email/senha
+- 🚪 Controle de sessão
+- 🛡️ Security Rules no Realtime Database
+
+---
+
+## 🚀 Como Usar
+
+### 1️⃣ Pré-requisitos
+
+- Navegador moderno (Chrome, Firefox, Edge)
+- Conexão com internet (para APIs e Firebase)
+
+### 2️⃣ Instalação
+
 ```bash
-git clone https://github.com/seu-usuario/pawg.git
-cd pawg
+# Clone o repositório
+git clone https://github.com/elvisfdj/Sistema-PAWG.git
+
+# Acesse a pasta
+cd Sistema-PAWG
+
+# Abra o index.html no navegador
+# OU hospede em qualquer servidor web
 ```
 
-### 2️⃣ **Configure o Firebase**
+### 3️⃣ Configuração Firebase
 
-No arquivo `index.html`, localize e configure suas credenciais Firebase:
+O sistema já vem configurado com Firebase. Para usar sua própria instância:
 
-```javascript
-const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_PROJETO.firebaseapp.com",
-    databaseURL: "https://SEU_PROJETO.firebaseio.com/",
-    projectId: "SEU_PROJETO",
-    storageBucket: "SEU_PROJETO.firebasestorage.app",
-    messagingSenderId: "SEU_ID",
-    appId: "SEU_APP_ID"
-};
-```
-
-### 3️⃣ **Configure as Regras do Firebase Realtime Database**
-
-No Firebase Console → Realtime Database → Regras:
+1. Crie um projeto no [Firebase Console](https://console.firebase.google.com)
+2. Ative **Authentication** (Email/Senha)
+3. Ative **Realtime Database**
+4. Configure as **Security Rules**:
 
 ```json
 {
   "rules": {
-    "documentos": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    },
     "contribuintes": {
       ".read": "auth != null",
       ".write": "auth != null"
     },
-    "faltas": {
+    "documentos": {
       ".read": "auth != null",
       ".write": "auth != null"
     }
@@ -103,125 +115,242 @@ No Firebase Console → Realtime Database → Regras:
 }
 ```
 
-### 4️⃣ **Crie Usuários no Firebase Authentication**
+5. Substitua as credenciais no código (linhas 36-43 do `index.html`)
 
-Firebase Console → Authentication → Adicionar usuário
+### 4️⃣ Primeiro Acesso
 
-### 5️⃣ **Abra o Sistema**
-
-Basta abrir o arquivo `index.html` no navegador ou hospedar no Firebase Hosting.
-
----
-
-## 📖 **Como Usar**
-
-### **Login**
-1. Acesse o sistema
-2. Faça login com email e senha cadastrados no Firebase
-
-### **Cadastro de Contribuintes**
-- **Opção 1:** Clique em "➕ Inserir" para cadastro manual
-- **Opção 2:** Use "📁 Importar TXT" para importação em massa
-
-### **Consulta de CNPJ**
-- Clique em 🔍 ao lado do contribuinte
-- Ou use "🔍 Consultar CNPJs" para consultar todos de uma vez
-
-### **Pesquisa de Faltas**
-1. Configure o intervalo de inscrições municipais
-2. Clique em "🕵️ Consultar Faltas"
-3. Veja os resultados na aba "📢 Faltas"
-
-### **Filtros Avançados**
-- Use o painel "🔍 Filtros Avançados"
-- Combine múltiplos filtros
-- Clique em "🗑️ Limpar" para resetar
-
-### **Backup e Restauração**
-- **Backup:** Clique em "💾 Backup" para baixar JSON
-- **Restauração:** Clique em "📥 Restaurar" e selecione o arquivo JSON
+- Faça login com credenciais cadastradas no Firebase Authentication
+- Comece importando contribuintes via TXT ou inserção manual
+- Configure o valor da UFICA para o ano corrente
 
 ---
 
-## 📂 **Estrutura do Projeto**
+## 📖 Guia de Uso
 
+### Importação de Contribuintes (TXT)
+
+Formato do arquivo:
 ```
-pawg/
-├── index.html              # Aplicação completa (React + Firebase)
-├── README.md               # Este arquivo
-└── backup/                 # Pasta para backups (não versionada)
+INSCRICAO    DOCUMENTO           NOME
+154610       12345678000190      EMPRESA EXEMPLO LTDA
+154611       98765432000100      COMERCIO ABC LTDA
 ```
 
----
+**Regras:**
+- Separação por TAB (`\t`)
+- CPF: 11 dígitos → classificado como AUTÔNOMO automaticamente
+- CNPJ: 14 dígitos → requer consulta API para classificação
 
-## 💡 **Dicas de Uso**
+### Consulta Individual vs Lote
 
-### **Performance**
-- ✅ Use filtros para navegar em listas grandes
-- ✅ Consulte CNPJs em lote fora do horário de pico
-- ✅ Faça backup regularmente (recomendado: mensal)
+**🔍 Consulta Individual (Botão Lupa)**
+- Consulta imediata de 1 CNPJ
+- Overlay com progresso
+- Delay de 12s (limite da API)
 
-### **Segurança**
-- ✅ Nunca compartilhe suas credenciais do Firebase
-- ✅ Use senhas fortes para usuários
-- ✅ Mantenha backups em local seguro
+**🔄 Consulta em Lote**
+- Processa todos os CNPJs não verificados
+- Tempo estimado: ~12s por CNPJ
+- Barra de progresso detalhada
 
-### **Limites do Firebase (Plano Gratuito)**
-- 💾 1GB de armazenamento
-- 🌐 10GB de transferência/mês
-- 👥 10.000 usuários simultâneos
+### Reprocessamento
 
----
+Atualiza dados de CNPJs já verificados:
+- ✅ **VISA**: Recalcula se precisa licença sanitária
+- ✅ **Porte**: Atualiza ME/DEMAIS
+- ✅ **Tributação**: Atualiza MEI/SIMPLES/LUCRO
 
-## 🆘 **Solução de Problemas**
+**Uso:** Configurações → Reprocessar → Selecionar opções
 
-| Problema | Solução |
-|----------|---------|
-| **Erro de permissão no Firebase** | Verifique as regras do Realtime Database |
-| **Consulta CNPJ não funciona** | API tem limite de 5 consultas/minuto |
-| **Dados não salvam** | Verifique conexão com internet e regras Firebase |
-| **Emojis aparecem diferentes** | Twemoji está carregando? Verifique console |
+### Consulta de Faltas
 
----
-
-## 📊 **Atualizações e Melhorias**
-
-### **Versão 2.0** (Atual)
-- ✅ Filtros avançados
-- ✅ Backup/Restauração local
-- ✅ Twemoji para emojis consistentes
-- ✅ Interface de pesquisa de faltas
-- ✅ Correção de duplicações no código
-
-### **Versão 1.0**
-- ✅ Sistema básico de cadastro
-- ✅ Cálculos tributários
-- ✅ Consulta API CNPJA
-- ✅ Exportação CSV
+Identifica inscrições municipais ausentes no mês:
+1. Defina intervalo (ex: 154610 até 154700)
+2. Sistema busca faltas
+3. Verifica se existem em outros meses do ano
+4. Salva resultado para consulta posterior
 
 ---
 
-## 👨‍💻 **Desenvolvedor**
+## 📊 Dashboards e Indicadores
+
+### Painel Principal
+- 📈 Total de contribuintes
+- ⏳ Pendentes de lançamento
+- ✅ Verificados via API
+- 🔄 Duplicidades detectadas
+
+### Cálculos Financeiros
+- 💰 Total TFLF (em UFICAs e Reais)
+- 💵 Total ISSQN (Autônomos)
+- 🏥 Total VISA (Vigilância)
+- 📊 Soma geral estimada
+
+### Filtros de Visualização
+- 📅 Mensal
+- 📊 Consolidado Anual
+- 📆 Por Período (intervalo de meses)
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+
+| Tecnologia | Propósito |
+|------------|-----------|
+| **React 18** | Interface reativa |
+| **Tailwind CSS** | Estilização responsiva |
+| **Firebase Auth** | Autenticação de usuários |
+| **Firebase Realtime DB** | Banco de dados em tempo real |
+| **Open CNPJA API** | Consulta de dados empresariais |
+| **Babel Standalone** | Transpilação JSX no browser |
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+Sistema-PAWG/
+│
+├── index.html              # Aplicação completa (SPA)
+├── README.md              # Este arquivo
+└── docs/
+    ├── manual-usuario.pdf # Manual detalhado (em breve)
+    └── capturas/          # Screenshots do sistema
+```
+
+---
+
+## 🔧 APIs e Integrações
+
+### Open CNPJA (open.cnpja.com)
+- **Endpoint**: `GET https://open.cnpja.com/office/{CNPJ}`
+- **Limite**: ~5 req/min (delay de 12s implementado)
+- **Retorno**: Dados cadastrais, porte, Simples Nacional, CNAEs
+
+**Campos utilizados:**
+```javascript
+{
+  company: {
+    size: { acronym: "ME" },
+    simei: { optant: false },
+    simples: { optant: true }
+  },
+  mainActivity: { id: 1091101 },
+  sideActivities: [{ id: 5611203 }, ...]
+}
+```
+
+---
+
+## 🎨 Capturas de Tela
+
+### Tela de Login
+Interface moderna com animações e gradientes
+
+### Dashboard de Contribuintes
+Tabela completa com filtros, marcadores e ações inline
+
+### Importação em Lote
+Upload de TXT com progresso em tempo real
+
+### Cálculo de Taxas
+Valores calculados automaticamente por contribuinte
+
+---
+
+## 🐛 Resolução de Problemas
+
+### Tela Branca após Login
+- **Causa**: Ordem de declaração de funções React
+- **Solução**: Versão mais recente do código já corrigida
+
+### Erro "CNPJ não encontrado (404)"
+- **Causa**: CNPJ inválido ou inexistente na Receita
+- **Solução**: Verificar dígitos do CNPJ, sistema ignora automaticamente
+
+### Consulta travada/lenta
+- **Causa**: Limite de taxa da API (5 req/min)
+- **Solução**: Sistema já implementa delay de 12s, aguarde
+
+### Duplicidades no banco
+- **Causa**: Importação repetida do mesmo arquivo
+- **Solução**: Use filtro "Duplicados" → Revisar → Excluir
+
+---
+
+## 🔄 Roadmap
+
+### Versão 2.1 (Em desenvolvimento)
+- [ ] Exportação para PDF
+- [ ] Geração de guias de cobrança
+- [ ] Integração com e-mail (envio automático)
+- [ ] Histórico de alterações (audit log)
+
+### Versão 2.2 (Planejada)
+- [ ] App Check (proteção adicional Firebase)
+- [ ] Backup/Restore via interface
+- [ ] Relatórios personalizados
+- [ ] Integração com sistemas externos
+
+---
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+
+---
+
+## 👨‍💻 Desenvolvedor
 
 **Elvis Ferreira**
 - 📧 Email: elvis.fdj@aol.com
 - 📱 WhatsApp: (22) 98138-2619
+- 💼 GitHub: [@elvisfdj](https://github.com/elvisfdj)
 
 ---
 
-## 📄 **Licença**
+## 🤝 Contribuindo
 
-Este projeto é de uso interno para gestão municipal. Todos os direitos reservados.
+Contribuições são bem-vindas! Para contribuir:
 
----
-
-## 🙏 **Agradecimentos**
-
-- Firebase pela infraestrutura gratuita
-- CNPJA pela API de consulta de CNPJs
-- Twitter pelo Twemoji
-- Comunidade React por todo o suporte
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/MinhaFeature`)
+3. Commit suas mudanças (`git commit -m 'Adiciona MinhaFeature'`)
+4. Push para a branch (`git push origin feature/MinhaFeature`)
+5. Abra um Pull Request
 
 ---
 
-**🎯 Sistema desenvolvido com foco em praticidade, segurança e eficiência!**
+## 🙏 Agradecimentos
+
+- Open CNPJA pela API pública de dados empresariais
+- Firebase/Google pela infraestrutura gratuita
+- Comunidade React e Tailwind CSS
+
+---
+
+## 📝 Notas de Versão
+
+### v2.0.0 (Fevereiro 2026)
+- ✅ Correção de lógica Simples/SIMEI (respeita `simples.optant`)
+- ✅ CPF → AUTÔNOMO automático na importação
+- ✅ Overlay de progresso na consulta individual
+- ✅ Reprocessamento filtrado (apenas CNPJs)
+- ✅ Interface de progresso melhorada
+- ✅ Correção de tela branca no login
+
+### v1.0.0 (Janeiro 2026)
+- 🎉 Lançamento inicial
+- Gestão de contribuintes
+- Cálculo de taxas
+- Controle de documentos
+
+---
+
+<div align="center">
+
+**⭐ Se este projeto foi útil, considere dar uma estrela!**
+
+Made with ☕ and 💻 by Elvis Ferreira
+
+</div>
