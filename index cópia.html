@@ -187,7 +187,7 @@
             '9602'  // Cabeleireiros, manicure, atividades de estética
         ];
         const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-        const AUDITORES = ['Adel A.', 'Alessandro N.', 'Aline P.', 'Amanda V.', 'Carolina S.', 'Erick J.', 'Fagne A.', 'Gabriel S.', 'Igor B.', 'Matheus C.', 'Nahttura P.', 'Natalia C.', 'Natalia G.', 'Pedro A.', 'Raphael O.', 'Rodrigo R.', 'Thiago S.', 'Tiago M.'];
+        const AUDITORES = ['Adel A.', 'Alessandro N.', 'Aline P.', 'Amanda V.', 'Carolina S.', 'Erick J.', 'Fagne A.', 'Gabriel S.', 'Igor B.', 'Jennipher A.', 'Matheus C.', 'Nahttura P.', 'Natalia C.', 'Natalia G.', 'Pedro A.', 'Raphael O.', 'Rodrigo R.', 'Thiago S.', 'Tiago M.'];
         const VALOR_UFICA_2026 = 179.50;
 
         const TABELA_VISA = [
@@ -1048,12 +1048,10 @@
 
                     if (simeiOptant) {
                         tributacao = 'MEI';
-                    } else if (porte === 'ME') {
-                        // ME sempre é SIMPLES (exceto se for MEI)
-                        tributacao = 'SIMPLES';
                     } else if (simplesOptant) {
-                        // DEMAIS pode ser Simples se optante
                         tributacao = 'SIMPLES';
+                    } else if (porte === 'ME') {
+                        tributacao = 'LUCRO PRESUMIDO';
                     } else {
                         tributacao = 'LUCRO PRESUMIDO';
                     }
@@ -1316,10 +1314,7 @@
 
                         let novos = 0;
                         let ignorados = 0;
-                        
-                        // Criar Sets com TODOS os dados existentes (não só verificados)
-                        const docsExistentes = new Set(list.map(l => l.documento));
-                        const inscricoesExistentes = new Set(list.map(l => l.inscricaoMunicipal).filter(Boolean));
+                        const docsVerificados = new Set(list.filter(l => l.verificado).map(l => l.documento));
 
                         for (let i = 0; i < linhas.length; i++) {
                             const l = linhas[i];
@@ -1338,8 +1333,7 @@
 
                             const clean = doc.replace(/\D/g, '');
 
-                            // ✅ VERIFICAR DUPLICIDADE por DOCUMENTO ou INSCRIÇÃO
-                            if (docsExistentes.has(clean) || (insc && inscricoesExistentes.has(insc))) {
+                            if (docsVerificados.has(clean)) {
                                 ignorados++;
                                 continue;
                             }
@@ -1569,32 +1563,10 @@
             };
 
             const update = async (id, campo, valor) => {
-                // Campos críticos que indicam edição manual em registros não-verificados
-                const camposCriticos = ['porte', 'tributacao', 'precisaVisa'];
-                
-                setList(list.map(item => {
-                    if (item.id === id) {
-                        const itemAtualizado = { ...item, [campo]: valor };
-                        
-                        // Se editou campo crítico e NÃO estava verificado pela API, marcar como editado manualmente
-                        if (camposCriticos.includes(campo) && !item.verificado) {
-                            itemAtualizado.editadoManualmente = true;
-                        }
-                        
-                        return itemAtualizado;
-                    }
-                    return item;
-                }));
-                
-                const updates = { [campo]: valor };
-                
-                // Marcar editadoManualmente no Firebase também
-                const item = list.find(i => i.id === id);
-                if (item && camposCriticos.includes(campo) && !item.verificado) {
-                    updates.editadoManualmente = true;
-                }
-                
-                await db.ref(`contribuintes/${ano}/${mes}/${id}`).update(updates);
+                setList(list.map(item =>
+                    item.id === id ? { ...item, [campo]: valor } : item
+                ));
+                await db.ref(`contribuintes/${ano}/${mes}/${id}`).update({ [campo]: valor });
             };
 
             const excluir = async (id) => {
@@ -1712,12 +1684,10 @@
 
                                 if (simeiOpt) {
                                     trib = 'MEI';
-                                } else if (porteAtual === 'ME') {
-                                    // ME sempre é SIMPLES (exceto se for MEI)
-                                    trib = 'SIMPLES';
                                 } else if (simplesOpt) {
-                                    // DEMAIS pode ser Simples se optante
                                     trib = 'SIMPLES';
+                                } else if (porteAtual === 'ME') {
+                                    trib = 'LUCRO PRESUMIDO';
                                 } else {
                                     trib = 'LUCRO PRESUMIDO';
                                 }
@@ -1902,11 +1872,8 @@
                                 <div className="text-sm text-gray-600 mb-1">Total</div>
                                 <div className="text-3xl font-bold text-gray-800">{dashboard.total}</div>
                             </div>
-                            <div 
-                                onClick={() => setFiltros({...filtros, apenasPendentes: !filtros.apenasPendentes})} 
-                                className="bg-yellow-50 rounded-lg p-4 border border-yellow-200 cursor-pointer hover:bg-yellow-100 transition-colors"
-                            >
-                                <div className="text-sm text-gray-600 mb-1">Pendentes {filtros.apenasPendentes && '✓'}</div>
+                            <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                                <div className="text-sm text-gray-600 mb-1">Pendentes</div>
                                 <div className="text-3xl font-bold text-yellow-600">{dashboard.pendentes}</div>
                             </div>
                             <div className="bg-green-50 rounded-lg p-4 border border-green-200">
@@ -2293,10 +2260,9 @@
                                                     <tr key={l.id} className={`border-t hover:bg-gray-50 ${getRowBgColor()}`}>
                                                         <td className="px-3 py-2 text-center">
                                                             {consultando ? <span className="text-blue-600">🔄</span> :
-                                                                isDuplicado ? <span className="text-orange-600">⚠️</span> :
-                                                                    l.verificado ? <span className="text-green-600">✅</span> :
-                                                                        l.editadoManualmente ? <span className="text-purple-600">☑️</span> :
-                                                                            <span className="text-gray-400">🕘</span>}
+                                                                l.verificado ? <span className="text-green-600">✅</span> :
+                                                                    isDuplicado ? <span className="text-orange-600">⚠️</span> :
+                                                                        <span className="text-gray-400">🕘</span>}
                                                         </td>
                                                         <td className="px-3 py-2">
                                                             <div className="relative">
