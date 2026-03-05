@@ -707,49 +707,59 @@
             const [processoTempoEstimado, setProcessoTempoEstimado] = useState('');
             const [processoAviso, setProcessoAviso] = useState(''); // Avisos temporários (404, 429, etc)
 
+            // PESQUISA RÁPIDA
+            const [pesquisaRapida, setPesquisaRapida] = useState('');
+
             const valorUficaAtual = valorUfica[ano] || VALOR_UFICA_2026;
 
             useEffect(() => {
+                let listeners = [];
+
                 const carregarDados = async () => {
                     try {
                         console.log('🔄 Carregando:', { modoVisualizacao, ano, mes });
 
                         if (modoVisualizacao === 'mensal') {
-                            // Modo mensal: carregar apenas o mês selecionado
+                            // ✅ MODO TEMPO REAL: Usar .on() em vez de .once()
                             const chave = `contribuintes/${ano}/${mes}`;
-                            const snapshot = await db.ref(chave).once('value');
-                            const data = snapshot.val();
+                            const ref = db.ref(chave);
+                            
+                            const listener = ref.on('value', (snapshot) => {
+                                const data = snapshot.val();
 
-                            // ✅ VALIDAÇÃO: Verificar se data existe e é objeto
-                            if (data && typeof data === 'object') {
-                                const lista = Object.entries(data)
-                                    .filter(([k, v]) => v && typeof v === 'object')
-                                    .map(([k, v]) => ({ id: k, ...v }));
-                                setList(lista);
+                                if (data && typeof data === 'object') {
+                                    const lista = Object.entries(data)
+                                        .filter(([k, v]) => v && typeof v === 'object')
+                                        .map(([k, v]) => ({ id: k, ...v }));
+                                    setList(lista);
 
-                                const marks = {};
-                                lista.forEach(item => {
-                                    if (item && item.marcador) marks[item.id] = item.marcador;
-                                });
-                                setMarcadores(marks);
+                                    const marks = {};
+                                    lista.forEach(item => {
+                                        if (item && item.marcador) marks[item.id] = item.marcador;
+                                    });
+                                    setMarcadores(marks);
 
-                                const inscricoesNumericas = lista
-                                    .filter(item => item && item.inscricaoMunicipal)
-                                    .map(item => item.inscricaoMunicipal.trim())
-                                    .filter(insc => insc && !isNaN(insc))
-                                    .map(insc => Number(insc));
+                                    const inscricoesNumericas = lista
+                                        .filter(item => item && item.inscricaoMunicipal)
+                                        .map(item => item.inscricaoMunicipal.trim())
+                                        .filter(insc => insc && !isNaN(insc))
+                                        .map(insc => Number(insc));
 
-                                if (inscricoesNumericas.length > 0) {
-                                    const minInscricao = Math.min(...inscricoesNumericas);
-                                    const maxInscricao = Math.max(...inscricoesNumericas);
-                                    setIntervaloInicio(String(minInscricao));
-                                    setIntervaloFim(String(maxInscricao));
+                                    if (inscricoesNumericas.length > 0) {
+                                        const minInscricao = Math.min(...inscricoesNumericas);
+                                        const maxInscricao = Math.max(...inscricoesNumericas);
+                                        setIntervaloInicio(String(minInscricao));
+                                        setIntervaloFim(String(maxInscricao));
+                                    }
+                                } else {
+                                    console.warn('⚠️ Sem dados para', chave);
+                                    setList([]);
+                                    setMarcadores({});
                                 }
-                            } else {
-                                console.warn('⚠️ Sem dados para', chave);
-                                setList([]);
-                                setMarcadores({});
-                            }
+                            });
+
+                            listeners.push({ ref, listener });
+
 
                         } else if (modoVisualizacao === 'anual') {
                             // Modo anual: carregar todos os meses do ano
@@ -817,6 +827,13 @@
                 };
 
                 carregarDados();
+
+                // ✅ CLEANUP: Desconectar listeners ao trocar mês/ano/modo
+                return () => {
+                    listeners.forEach(({ ref, listener }) => {
+                        ref.off('value', listener);
+                    });
+                };
             }, [mes, ano, modoVisualizacao, periodoInicio, periodoFim]);
 
             // Carregar faltas do Firebase
@@ -1518,6 +1535,16 @@
             const aplicarFiltros = (lista) => {
                 let listaFiltrada = [...lista];
 
+                // 🔍 PESQUISA RÁPIDA (prioridade máxima)
+                if (pesquisaRapida) {
+                    const termo = pesquisaRapida.trim().toLowerCase();
+                    listaFiltrada = listaFiltrada.filter(item =>
+                        (item.documento && item.documento.replace(/\D/g, '').includes(termo.replace(/\D/g, ''))) ||
+                        (item.inscricaoMunicipal && item.inscricaoMunicipal.toLowerCase().includes(termo)) ||
+                        (item.razaoSocial && item.razaoSocial.toLowerCase().includes(termo))
+                    );
+                }
+
                 // Filtro de busca (nome, documento, inscrição)
                 if (filtros.busca) {
                     const buscaLower = filtros.busca.toLowerCase();
@@ -1995,6 +2022,25 @@
                                     <span>📥 Restaurar</span>
                                     <input type="file" accept=".json" onChange={e => { if (e.target.files[0]) restaurarBackup(e.target.files[0]); }} className="hidden" />
                                 </label>
+
+                                <div className="flex items-center gap-2 bg-white border-2 border-blue-500 rounded px-3 py-2 min-w-[300px]">
+                                    <span className="text-blue-600">🔍</span>
+                                    <input
+                                        type="text"
+                                        value={pesquisaRapida}
+                                        onChange={e => setPesquisaRapida(e.target.value)}
+                                        placeholder="Pesquisar por CPF, CNPJ ou Inscrição..."
+                                        className="flex-1 outline-none text-sm"
+                                    />
+                                    {pesquisaRapida && (
+                                        <button
+                                            onClick={() => setPesquisaRapida('')}
+                                            className="text-gray-400 hover:text-gray-600 font-bold"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
