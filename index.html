@@ -381,9 +381,10 @@
                             </div>
                         </div>
 
-                        <div className="mt-6 text-center">
-                            <p className="text-white/80 text-sm font-medium drop-shadow-lg">
-                                💻 Desenvolvido por Elvis Ferreira
+                        <div className="mt-8 text-center">
+                            <p className="text-white text-sm font-medium drop-shadow-lg flex items-center justify-center gap-2">
+                                <span className="text-base">💻</span>
+                                <span>Desenvolvido por Elvis Ferreira</span>
                             </p>
                         </div>
                     </div>
@@ -725,6 +726,7 @@
 
             // PESQUISA RÁPIDA
             const [pesquisaRapida, setPesquisaRapida] = useState('');
+            const [buscandoGlobal, setBuscandoGlobal] = useState(false);
 
             const valorUficaAtual = valorUfica[ano] || VALOR_UFICA_2026;
 
@@ -880,6 +882,64 @@
                     refFaltas.off('value', listener);
                 };
             }, [mes, ano]);
+
+            // ============================================
+            // BUSCA GLOBAL (todos os meses)
+            // ============================================
+            useEffect(() => {
+                const buscarGlobal = async () => {
+                    if (!pesquisaRapida || pesquisaRapida.trim().length < 2) {
+                        // Se não tem pesquisa, não faz nada (usa o mês atual)
+                        return;
+                    }
+
+                    setBuscandoGlobal(true);
+                    const termo = pesquisaRapida.trim().toLowerCase();
+                    const resultados = [];
+
+                    try {
+                        // Buscar em TODOS os meses do ano atual
+                        for (let m = 0; m <= 11; m++) {
+                            const snapshot = await db.ref(`contribuintes/${ano}/${m}`).once('value');
+                            const data = snapshot.val();
+
+                            if (data && typeof data === 'object') {
+                                Object.entries(data).forEach(([k, v]) => {
+                                    if (v && typeof v === 'object') {
+                                        const item = { id: k, ...v, mesOrigem: m };
+                                        
+                                        // Verificar se corresponde ao termo de busca
+                                        const matchDoc = item.documento && item.documento.replace(/\D/g, '').includes(termo.replace(/\D/g, ''));
+                                        const matchInsc = item.inscricaoMunicipal && item.inscricaoMunicipal.toLowerCase().includes(termo);
+                                        const matchNome = item.razaoSocial && item.razaoSocial.toLowerCase().includes(termo);
+                                        
+                                        if (matchDoc || matchInsc || matchNome) {
+                                            resultados.push(item);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+
+                        // Atualizar lista com resultados da busca global
+                        if (resultados.length > 0) {
+                            setList(resultados);
+                            console.log(`🔍 Busca global encontrou ${resultados.length} resultado(s)`);
+                        } else {
+                            setList([]);
+                            console.log('🔍 Busca global: nenhum resultado');
+                        }
+                    } catch (error) {
+                        console.error('Erro na busca global:', error);
+                    } finally {
+                        setBuscandoGlobal(false);
+                    }
+                };
+
+                // Debounce: aguardar 500ms após parar de digitar
+                const timer = setTimeout(buscarGlobal, 500);
+                return () => clearTimeout(timer);
+            }, [pesquisaRapida, ano]);
 
             const requestSort = (key) => {
                 let direction = 'asc';
@@ -2040,15 +2100,18 @@
                                 </label>
 
                                 <div className="flex items-center gap-2 bg-white border-2 border-blue-500 rounded px-3 py-2 min-w-[300px]">
-                                    <span className="text-blue-600">🔍</span>
+                                    <span className="text-blue-600">{buscandoGlobal ? '⏳' : '🔍'}</span>
                                     <input
                                         type="text"
                                         value={pesquisaRapida}
                                         onChange={e => setPesquisaRapida(e.target.value)}
-                                        placeholder="Pesquisar por CPF, CNPJ ou Inscrição..."
+                                        placeholder="Buscar CNPJ, CPF ou Inscrição..."
                                         className="flex-1 outline-none text-sm"
                                     />
-                                    {pesquisaRapida && (
+                                    {buscandoGlobal && (
+                                        <span className="text-xs text-blue-600 animate-pulse">Buscando...</span>
+                                    )}
+                                    {pesquisaRapida && !buscandoGlobal && (
                                         <button
                                             onClick={() => setPesquisaRapida('')}
                                             className="text-gray-400 hover:text-gray-600 font-bold"
@@ -2224,6 +2287,11 @@
                                             <th className="px-3 py-2 text-left " >
                                                 Inscrição
                                             </th>
+                                            {pesquisaRapida && (
+                                                <th className="px-3 py-2 text-center">
+                                                    Mês
+                                                </th>
+                                            )}
                                             <th className="px-3 py-2 text-left " >
                                                 Documento
                                             </th>
@@ -2389,6 +2457,13 @@
                                                             </div>
                                                         </td>
                                                         <td className="px-3 py-2">{l.inscricaoMunicipal}</td>
+                                                        {pesquisaRapida && (
+                                                            <td className="px-3 py-2 text-center !bg-white">
+                                                                <span className="px-3 py-1.5 rounded-md text-xs font-bold !bg-blue-600 !text-white shadow-sm">
+                                                                    {MESES[l.mesOrigem || mes]}
+                                                                </span>
+                                                            </td>
+                                                        )}
                                                         <td className="px-3 py-2 font-mono">{l.documento}</td>
                                                         <td className="px-3 py-2">{l.razaoSocial}</td>
                                                         <td className="px-3 py-2 text-center">
