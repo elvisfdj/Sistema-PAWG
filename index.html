@@ -13,8 +13,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
-    <!-- Biblioteca DOCX para gerar documentos Word -->
-    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <!-- JSZip para gerar arquivos DOCX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         /* Força emojis do Twemoji (estilo Twitter) em todos os sistemas */
         img.emoji {
@@ -51,21 +52,17 @@
         // ============================================
         // VERIFICAÇÃO DA BIBLIOTECA DOCX
         // ============================================
-        console.log('🔍 Verificando biblioteca DOCX...');
-        console.log('window.docx:', typeof window.docx);
+        console.log('🔍 Verificando bibliotecas...');
+        console.log('JSZip:', typeof JSZip);
+        console.log('FileSaver:', typeof saveAs);
         
-        // Aguardar um pouco se a biblioteca ainda não carregou
-        if (typeof window.docx === 'undefined') {
-            console.warn('⚠️ DOCX ainda não carregada, aguardando...');
-            setTimeout(() => {
-                if (typeof window.docx !== 'undefined') {
-                    console.log('✅ DOCX carregada com sucesso!');
-                } else {
-                    console.error('❌ DOCX não foi carregada após timeout');
-                }
-            }, 2000);
+        if (typeof JSZip !== 'undefined' && typeof saveAs !== 'undefined') {
+            console.log('✅ Todas as bibliotecas carregadas!');
         } else {
-            console.log('✅ DOCX já está carregada!');
+            console.error('❌ Faltam bibliotecas:', {
+                JSZip: typeof JSZip === 'undefined' ? 'FALTANDO' : 'OK',
+                FileSaver: typeof saveAs === 'undefined' ? 'FALTANDO' : 'OK'
+            });
         }
 
         const CNAES_VISA = [
@@ -2685,13 +2682,10 @@
                                 return;
                             }
                             
-                            // Verificar múltiplas formas de acesso à biblioteca DOCX
-                            const docxLib = window.docx || window.Docx || (typeof docx !== 'undefined' ? docx : null);
-                            
-                            if (!docxLib) {
-                                console.error('DOCX não encontrado. window.docx:', window.docx);
-                                console.error('Todas as propriedades window:', Object.keys(window).filter(k => k.toLowerCase().includes('docx')));
-                                alert('❌ Biblioteca DOCX não carregada.\n\nPossíveis soluções:\n1. Recarregue a página (F5)\n2. Limpe o cache (Ctrl+Shift+Del)\n3. Verifique sua conexão com a internet');
+                            // Verificar se JSZip está carregado
+                            if (typeof JSZip === 'undefined') {
+                                alert('❌ Biblioteca JSZip não carregada.\n\nRecarregue a página (F5) e tente novamente.');
+                                console.error('JSZip não está definido. Verifique se o CDN carregou.');
                                 return;
                             }
 
@@ -2699,8 +2693,7 @@
 
                             try {
                                 const numInicial = Number(configEditais.numeroInicial) || 1;
-                                const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, WidthType, BorderStyle, HeadingLevel } = docxLib;
-
+                                
                                 const lotes = [];
                                 for (let i = 0; i < selecionados.length; i += qtdPorEdital) {
                                     lotes.push(selecionados.slice(i, i + qtdPorEdital));
@@ -2714,141 +2707,123 @@
                                     const dataEditalBR = formatarDataBR(dataEdital);
                                     const dataEditalExtensa = formatarDataExtensa(dataEdital);
 
-                                    const titlePara = new Paragraph({
-                                        alignment: AlignmentType.CENTER,
-                                        spacing: { after: 200 },
-                                        children: [
-                                            new TextRun({
-                                                text: `EDITAL Nº ${numStr}/${ano}/SAR/SMF`,
-                                                bold: true,
-                                                size: 28,
-                                                font: 'Arial',
-                                            }),
-                                        ],
-                                    });
-
-                                    const introPara = new Paragraph({
-                                        alignment: AlignmentType.JUSTIFIED,
-                                        spacing: { after: 200 },
-                                        children: [
-                                            new TextRun({
-                                                text: `Ficam notificados os contribuintes abaixo identificados, para que compareçam à Subsecretaria Adjunta de Receita da Secretaria Municipal de Fazenda, situada na Av. Arthur Bernardes, Nº 100 – Parque Flamboyant - Campos dos Goytacazes/RJ, no prazo de 10 (dez) dias úteis, a contar da publicação deste edital, para o efeito do cumprimento das obrigações tributárias de licença de funcionamento. O não comparecimento implicará nas sanções previstas em lei.`,
-                                                size: 22,
-                                                font: 'Arial',
-                                            }),
-                                        ],
-                                    });
-
-                                    // Tabela de contribuintes
-                                    const headerRow = new TableRow({
-                                        tableHeader: true,
-                                        children: [
-                                            new TableCell({
-                                                width: { size: 8, type: WidthType.PERCENTAGE },
-                                                shading: { fill: '2563EB', color: 'FFFFFF' },
-                                                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'N°', bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })] })],
-                                            }),
-                                            new TableCell({
-                                                width: { size: 17, type: WidthType.PERCENTAGE },
-                                                shading: { fill: '2563EB', color: 'FFFFFF' },
-                                                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Inscrição', bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })] })],
-                                            }),
-                                            new TableCell({
-                                                width: { size: 75, type: WidthType.PERCENTAGE },
-                                                shading: { fill: '2563EB', color: 'FFFFFF' },
-                                                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Identificação do Contribuinte', bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })] })],
-                                            }),
-                                        ],
-                                    });
-
-                                    const dataRows = lote.map((item, idx) => {
+                                    // Criar arquivo DOCX manualmente usando JSZip
+                                    const zip = new JSZip();
+                                    
+                                    // [Content_Types].xml
+                                    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`);
+                                    
+                                    // _rels/.rels
+                                    const rels = zip.folder('_rels');
+                                    rels.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`);
+                                    
+                                    // word/_rels/document.xml.rels
+                                    const wordFolder = zip.folder('word');
+                                    const wordRels = wordFolder.folder('_rels');
+                                    wordRels.file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>`);
+                                    
+                                    // Gerar linhas da tabela
+                                    let tabelaLinhas = '';
+                                    lote.forEach((emp, idx) => {
                                         const fill = idx % 2 === 0 ? 'EFF6FF' : 'FFFFFF';
-                                        return new TableRow({
-                                            children: [
-                                                new TableCell({
-                                                    shading: { fill },
-                                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(idx + 1).padStart(2, '0'), size: 20, font: 'Arial' })] })],
-                                                }),
-                                                new TableCell({
-                                                    shading: { fill },
-                                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.inscricaoMunicipal || '-', size: 20, font: 'Arial' })] })],
-                                                }),
-                                                new TableCell({
-                                                    shading: { fill },
-                                                    children: [new Paragraph({ children: [new TextRun({ text: item.razaoSocial || '-', size: 20, font: 'Arial' })] })],
-                                                }),
-                                            ],
-                                        });
+                                        const nome = (emp.razaoSocial || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                        tabelaLinhas += `
+        <w:tr>
+            <w:tc>
+                <w:tcPr><w:tcW w:w="800" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
+                <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${String(idx + 1).padStart(2, '0')}</w:t></w:r></w:p>
+            </w:tc>
+            <w:tc>
+                <w:tcPr><w:tcW w:w="1700" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
+                <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${emp.inscricaoMunicipal || ''}</w:t></w:r></w:p>
+            </w:tc>
+            <w:tc>
+                <w:tcPr><w:tcW w:w="7500" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
+                <w:p><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${nome.toUpperCase()}</w:t></w:r></w:p>
+            </w:tc>
+        </w:tr>`;
                                     });
+                                    
+                                    // word/document.xml
+                                    wordFolder.file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:p>
+        <w:pPr><w:jc w:val="center"/><w:spacing w:after="200"/></w:pPr>
+        <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t>EDITAL Nº ${numStr}/${ano}/SAR/SMF</w:t></w:r>
+    </w:p>
+    <w:p>
+        <w:pPr><w:jc w:val="both"/><w:spacing w:after="200"/></w:pPr>
+        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Ficam notificados os contribuintes abaixo identificados, para que compareçam à Subsecretaria Adjunta de Receita da Secretaria Municipal de Fazenda, situada na Av. Arthur Bernardes, Nº 100 – Parque Flamboyant - Campos dos Goytacazes/RJ, no prazo de 10 (dez) dias úteis, a contar da publicação deste edital, para o efeito do cumprimento das obrigações tributárias de licença de funcionamento. O não comparecimento implicará nas sanções previstas em lei.</w:t></w:r>
+    </w:p>
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="10000" w:type="dxa"/>
+        <w:tblBorders>
+          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+        </w:tblBorders>
+      </w:tblPr>
+      <w:tr>
+        <w:tc>
+            <w:tcPr><w:tcW w:w="800" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>N°</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+            <w:tcPr><w:tcW w:w="1700" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Inscrição</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+            <w:tcPr><w:tcW w:w="7500" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
+            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Identificação do Contribuinte</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>
+      ${tabelaLinhas}
+    </w:tbl>
+    <w:p>
+        <w:pPr><w:jc w:val="right"/><w:spacing w:before="300" w:after="100"/></w:pPr>
+        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Campos dos Goytacazes, ${dataEditalExtensa}.</w:t></w:r>
+    </w:p>
+    <w:p>
+        <w:pPr><w:jc w:val="center"/><w:spacing w:before="600" w:after="100"/></w:pPr>
+        <w:r><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Marcelo Alvarenga Moço</w:t></w:r>
+    </w:p>
+    <w:p>
+        <w:pPr><w:jc w:val="center"/></w:pPr>
+        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Secretaria Municipal de Fazenda</w:t></w:r>
+    </w:p>
+    <w:p>
+        <w:pPr><w:jc w:val="center"/></w:pPr>
+        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Subsecretario Adjunto de Receita</w:t></w:r>
+    </w:p>
+    <w:p>
+        <w:pPr><w:jc w:val="center"/></w:pPr>
+        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Mat: 13.877</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>`);
 
-                                    const table = new Table({
-                                        width: { size: 100, type: WidthType.PERCENTAGE },
-                                        rows: [headerRow, ...dataRows],
-                                    });
-
-                                    const localPara = new Paragraph({
-                                        alignment: AlignmentType.RIGHT,
-                                        spacing: { before: 300, after: 100 },
-                                        children: [
-                                            new TextRun({
-                                                text: `Campos dos Goytacazes, ${dataEditalExtensa}.`,
-                                                size: 22,
-                                                font: 'Arial',
-                                            }),
-                                        ],
-                                    });
-
-                                    const assinaturaPara = new Paragraph({
-                                        alignment: AlignmentType.CENTER,
-                                        spacing: { before: 600, after: 100 },
-                                        children: [
-                                            new TextRun({ text: 'Marcelo Alvarenga Moço', bold: true, size: 22, font: 'Arial' }),
-                                        ],
-                                    });
-
-                                    const cargoPara = new Paragraph({
-                                        alignment: AlignmentType.CENTER,
-                                        children: [
-                                            new TextRun({ text: 'Secretaria Municipal de Fazenda', size: 22, font: 'Arial' }),
-                                        ],
-                                    });
-
-                                    const cargoPara2 = new Paragraph({
-                                        alignment: AlignmentType.CENTER,
-                                        children: [
-                                            new TextRun({ text: 'Subsecretario Adjunto de Receita', size: 22, font: 'Arial' }),
-                                        ],
-                                    });
-
-                                    const matriculaPara = new Paragraph({
-                                        alignment: AlignmentType.CENTER,
-                                        children: [
-                                            new TextRun({ text: 'Mat: 13.877', size: 22, font: 'Arial' }),
-                                        ],
-                                    });
-
-                                    const doc = new Document({
-                                        sections: [{
-                                            properties: {
-                                                page: {
-                                                    margin: { top: 720, right: 720, bottom: 720, left: 720 },
-                                                },
-                                            },
-                                            children: [titlePara, introPara, table, localPara, assinaturaPara, cargoPara, cargoPara2, matriculaPara],
-                                        }],
-                                    });
-
-                                    const buffer = await Packer.toBlob(doc);
-                                    const url = URL.createObjectURL(buffer);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `Edital_${numStr}_${ano}_SAR_SMF_${dataEditalBR.replace(/\//g, '-')}.docx`;
-                                    link.click();
-                                    URL.revokeObjectURL(url);
+                                    // Gerar blob e fazer download
+                                    const blob = await zip.generateAsync({type: 'blob'});
+                                    saveAs(blob, `Edital_${numStr}_${ano}_SAR_SMF_${dataEditalBR.replace(/\//g, '-')}.docx`);
 
                                     // Pequena pausa entre downloads
                                     if (i < lotes.length - 1) {
-                                        await new Promise(r => setTimeout(r, 500));
+                                        await new Promise(r => setTimeout(r, 800));
                                     }
                                 }
 
