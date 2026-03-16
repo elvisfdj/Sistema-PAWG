@@ -13,6 +13,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <!-- Biblioteca DOCX para gerar documentos Word -->
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
     <style>
         /* Força emojis do Twemoji (estilo Twitter) em todos os sistemas */
         img.emoji {
@@ -45,6 +47,26 @@
 
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+
+        // ============================================
+        // VERIFICAÇÃO DA BIBLIOTECA DOCX
+        // ============================================
+        console.log('🔍 Verificando biblioteca DOCX...');
+        console.log('window.docx:', typeof window.docx);
+        
+        // Aguardar um pouco se a biblioteca ainda não carregou
+        if (typeof window.docx === 'undefined') {
+            console.warn('⚠️ DOCX ainda não carregada, aguardando...');
+            setTimeout(() => {
+                if (typeof window.docx !== 'undefined') {
+                    console.log('✅ DOCX carregada com sucesso!');
+                } else {
+                    console.error('❌ DOCX não foi carregada após timeout');
+                }
+            }, 2000);
+        } else {
+            console.log('✅ DOCX já está carregada!');
+        }
 
         const CNAES_VISA = [
             // ========================================
@@ -713,6 +735,16 @@
             // ── Estados para Reprocessamento ───────────────────
             const [modalReprocessar, setModalReprocessar] = useState(false);
             const [opcoesReproc, setOpcoesReproc] = useState({ visa: true, porte: true, trib: true });
+
+            // ── Estados para Geração de Editais ────────────────
+            const [modalEditais, setModalEditais] = useState(false);
+            const [configEditais, setConfigEditais] = useState({
+                numeroInicial: 1,
+                empresasPorEdital: 10,
+                dataInicial: new Date().toISOString().split('T')[0],
+                abasSelecionadas: ['Principal', 'Autonomo']
+            });
+            const [gerandoEditais, setGerandoEditais] = useState(false);
             const [rodando, setRodando] = useState(false);
 
             // PROGRESSO
@@ -2086,6 +2118,15 @@
                                     ⚙️ Reprocessar
                                 </button>
 
+                                <button
+                                    onClick={() => setModalEditais(true)}
+                                    className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
+                                    disabled={modoVisualizacao !== 'mensal'}
+                                    title={modoVisualizacao !== 'mensal' ? 'Disponível apenas no modo Mensal' : 'Gerar Editais em DOCX'}
+                                >
+                                    📋 Gerar Editais
+                                </button>
+
                                 <button onClick={exportCSV} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
                                     Exportar CSV
                                 </button>
@@ -2549,6 +2590,404 @@
                             </div>
                         </div>
                     </div>
+
+                    {/* 📋 MODAL GERAR EDITAIS */}
+                    {modalEditais && (() => {
+                        // ── Constantes de configuração ──────────────
+                        const FERIADOS = [
+                            '2026-01-01','2026-01-20','2026-02-16','2026-02-17',
+                            '2026-04-03','2026-04-21','2026-05-01','2026-06-04',
+                            '2026-09-07','2026-10-12','2026-11-02','2026-11-15',
+                            '2026-11-28','2026-12-25',
+                            '2027-01-01','2027-01-20','2027-02-15','2027-02-16',
+                            '2027-04-02','2027-04-21','2027-05-01','2027-05-27',
+                            '2027-09-07','2027-10-12','2027-11-02','2027-11-15',
+                            '2027-11-28','2027-12-25',
+                        ];
+
+                        const isFeriado = (data) => {
+                            const s = data.toISOString().split('T')[0];
+                            return FERIADOS.includes(s);
+                        };
+
+                        const proximoDiaUtil = (data) => {
+                            let d = new Date(data);
+                            d.setDate(d.getDate() + 1);
+                            while (d.getDay() === 0 || d.getDay() === 6 || isFeriado(d)) {
+                                d.setDate(d.getDate() + 1);
+                            }
+                            return d;
+                        };
+
+                        const formatarDataBR = (data) => {
+                            return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                        };
+
+                        const formatarDataExtensa = (data) => {
+                            const mesesExt = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+                            const d = new Date(data);
+                            const dia = d.getUTCDate();
+                            const mes2 = mesesExt[d.getUTCMonth()];
+                            const ano2 = d.getUTCFullYear();
+                            return `${dia} de ${mes2} de ${ano2}`;
+                        };
+
+                        // ── Pré-visualização: calcular quantos editais e datas ──
+                        const abasDisponiveis = [
+                            { key: 'Principal', label: '📋 Principal', fn: l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO' },
+                            { key: 'MEI', label: '🏪 MEI', fn: l => l.tributacao === 'MEI' },
+                            { key: 'Autonomo', label: '🧔🏽 Autônomo', fn: l => l.tributacao === 'AUTONOMO' },
+                            { key: 'VISA', label: '🏥 VISA', fn: l => l.precisaVisa },
+                        ];
+
+                        const getSelecionados = () => {
+                            let todos = [];
+                            configEditais.abasSelecionadas.forEach(key => {
+                                const aba = abasDisponiveis.find(a => a.key === key);
+                                if (aba) {
+                                    const contribuintes = list.filter(aba.fn);
+                                    todos = [...todos, ...contribuintes];
+                                }
+                            });
+                            // Remover duplicatas por ID
+                            const seen = new Set();
+                            todos = todos.filter(item => {
+                                if (seen.has(item.id)) return false;
+                                seen.add(item.id);
+                                return true;
+                            });
+                            // Ordenar: por inscrição municipal (crescente)
+                            return todos.sort((a, b) => Number(a.inscricaoMunicipal || 0) - Number(b.inscricaoMunicipal || 0));
+                        };
+
+                        const selecionados = getSelecionados();
+                        const qtdPorEdital = Number(configEditais.empresasPorEdital) || 10;
+                        const numLotes = Math.ceil(selecionados.length / qtdPorEdital);
+
+                        // Calcular todas as datas
+                        const getDatas = () => {
+                            const datas = [];
+                            const partes = configEditais.dataInicial.split('-').map(Number);
+                            let d = new Date(Date.UTC(partes[0], partes[1] - 1, partes[2]));
+                            for (let i = 0; i < numLotes; i++) {
+                                datas.push(new Date(d));
+                                d = proximoDiaUtil(d);
+                            }
+                            return datas;
+                        };
+
+                        const datas = getDatas();
+
+                        // ── Função principal de geração ──────────────────────
+                        const gerarEditais = async () => {
+                            if (selecionados.length === 0) {
+                                alert('⚠️ Nenhum contribuinte selecionado nas abas escolhidas!');
+                                return;
+                            }
+                            
+                            // Verificar múltiplas formas de acesso à biblioteca DOCX
+                            const docxLib = window.docx || window.Docx || (typeof docx !== 'undefined' ? docx : null);
+                            
+                            if (!docxLib) {
+                                console.error('DOCX não encontrado. window.docx:', window.docx);
+                                console.error('Todas as propriedades window:', Object.keys(window).filter(k => k.toLowerCase().includes('docx')));
+                                alert('❌ Biblioteca DOCX não carregada.\n\nPossíveis soluções:\n1. Recarregue a página (F5)\n2. Limpe o cache (Ctrl+Shift+Del)\n3. Verifique sua conexão com a internet');
+                                return;
+                            }
+
+                            setGerandoEditais(true);
+
+                            try {
+                                const numInicial = Number(configEditais.numeroInicial) || 1;
+                                const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, AlignmentType, WidthType, BorderStyle, HeadingLevel } = docxLib;
+
+                                const lotes = [];
+                                for (let i = 0; i < selecionados.length; i += qtdPorEdital) {
+                                    lotes.push(selecionados.slice(i, i + qtdPorEdital));
+                                }
+
+                                for (let i = 0; i < lotes.length; i++) {
+                                    const lote = lotes[i];
+                                    const numEdital = numInicial + i;
+                                    const numStr = String(numEdital).padStart(3, '0');
+                                    const dataEdital = datas[i];
+                                    const dataEditalBR = formatarDataBR(dataEdital);
+                                    const dataEditalExtensa = formatarDataExtensa(dataEdital);
+
+                                    const titlePara = new Paragraph({
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { after: 200 },
+                                        children: [
+                                            new TextRun({
+                                                text: `EDITAL Nº ${numStr}/${ano}/SAR/SMF`,
+                                                bold: true,
+                                                size: 28,
+                                                font: 'Arial',
+                                            }),
+                                        ],
+                                    });
+
+                                    const introPara = new Paragraph({
+                                        alignment: AlignmentType.JUSTIFIED,
+                                        spacing: { after: 200 },
+                                        children: [
+                                            new TextRun({
+                                                text: `Ficam notificados os contribuintes abaixo identificados, para que compareçam à Subsecretaria Adjunta de Receita da Secretaria Municipal de Fazenda, situada na Av. Arthur Bernardes, Nº 100 – Parque Flamboyant - Campos dos Goytacazes/RJ, no prazo de 10 (dez) dias úteis, a contar da publicação deste edital, para o efeito do cumprimento das obrigações tributárias de licença de funcionamento. O não comparecimento implicará nas sanções previstas em lei.`,
+                                                size: 22,
+                                                font: 'Arial',
+                                            }),
+                                        ],
+                                    });
+
+                                    // Tabela de contribuintes
+                                    const headerRow = new TableRow({
+                                        tableHeader: true,
+                                        children: [
+                                            new TableCell({
+                                                width: { size: 8, type: WidthType.PERCENTAGE },
+                                                shading: { fill: '2563EB', color: 'FFFFFF' },
+                                                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'N°', bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })] })],
+                                            }),
+                                            new TableCell({
+                                                width: { size: 17, type: WidthType.PERCENTAGE },
+                                                shading: { fill: '2563EB', color: 'FFFFFF' },
+                                                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Inscrição', bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })] })],
+                                            }),
+                                            new TableCell({
+                                                width: { size: 75, type: WidthType.PERCENTAGE },
+                                                shading: { fill: '2563EB', color: 'FFFFFF' },
+                                                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Identificação do Contribuinte', bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })] })],
+                                            }),
+                                        ],
+                                    });
+
+                                    const dataRows = lote.map((item, idx) => {
+                                        const fill = idx % 2 === 0 ? 'EFF6FF' : 'FFFFFF';
+                                        return new TableRow({
+                                            children: [
+                                                new TableCell({
+                                                    shading: { fill },
+                                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(idx + 1).padStart(2, '0'), size: 20, font: 'Arial' })] })],
+                                                }),
+                                                new TableCell({
+                                                    shading: { fill },
+                                                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: item.inscricaoMunicipal || '-', size: 20, font: 'Arial' })] })],
+                                                }),
+                                                new TableCell({
+                                                    shading: { fill },
+                                                    children: [new Paragraph({ children: [new TextRun({ text: item.razaoSocial || '-', size: 20, font: 'Arial' })] })],
+                                                }),
+                                            ],
+                                        });
+                                    });
+
+                                    const table = new Table({
+                                        width: { size: 100, type: WidthType.PERCENTAGE },
+                                        rows: [headerRow, ...dataRows],
+                                    });
+
+                                    const localPara = new Paragraph({
+                                        alignment: AlignmentType.RIGHT,
+                                        spacing: { before: 300, after: 100 },
+                                        children: [
+                                            new TextRun({
+                                                text: `Campos dos Goytacazes, ${dataEditalExtensa}.`,
+                                                size: 22,
+                                                font: 'Arial',
+                                            }),
+                                        ],
+                                    });
+
+                                    const assinaturaPara = new Paragraph({
+                                        alignment: AlignmentType.CENTER,
+                                        spacing: { before: 600, after: 100 },
+                                        children: [
+                                            new TextRun({ text: 'Marcelo Alvarenga Moço', bold: true, size: 22, font: 'Arial' }),
+                                        ],
+                                    });
+
+                                    const cargoPara = new Paragraph({
+                                        alignment: AlignmentType.CENTER,
+                                        children: [
+                                            new TextRun({ text: 'Secretaria Municipal de Fazenda', size: 22, font: 'Arial' }),
+                                        ],
+                                    });
+
+                                    const cargoPara2 = new Paragraph({
+                                        alignment: AlignmentType.CENTER,
+                                        children: [
+                                            new TextRun({ text: 'Subsecretario Adjunto de Receita', size: 22, font: 'Arial' }),
+                                        ],
+                                    });
+
+                                    const matriculaPara = new Paragraph({
+                                        alignment: AlignmentType.CENTER,
+                                        children: [
+                                            new TextRun({ text: 'Mat: 13.877', size: 22, font: 'Arial' }),
+                                        ],
+                                    });
+
+                                    const doc = new Document({
+                                        sections: [{
+                                            properties: {
+                                                page: {
+                                                    margin: { top: 720, right: 720, bottom: 720, left: 720 },
+                                                },
+                                            },
+                                            children: [titlePara, introPara, table, localPara, assinaturaPara, cargoPara, cargoPara2, matriculaPara],
+                                        }],
+                                    });
+
+                                    const buffer = await Packer.toBlob(doc);
+                                    const url = URL.createObjectURL(buffer);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `Edital_${numStr}_${ano}_SAR_SMF_${dataEditalBR.replace(/\//g, '-')}.docx`;
+                                    link.click();
+                                    URL.revokeObjectURL(url);
+
+                                    // Pequena pausa entre downloads
+                                    if (i < lotes.length - 1) {
+                                        await new Promise(r => setTimeout(r, 500));
+                                    }
+                                }
+
+                                alert(`✅ ${lotes.length} edital(is) gerado(s) com sucesso!\n\nArquivos baixados no seu computador.`);
+                                setModalEditais(false);
+                            } catch (err) {
+                                console.error('Erro ao gerar editais:', err);
+                                alert('❌ Erro ao gerar editais: ' + err.message);
+                            } finally {
+                                setGerandoEditais(false);
+                            }
+                        };
+
+                        const toggleAba = (key) => {
+                            const atual = configEditais.abasSelecionadas;
+                            if (atual.includes(key)) {
+                                setConfigEditais({ ...configEditais, abasSelecionadas: atual.filter(k => k !== key) });
+                            } else {
+                                setConfigEditais({ ...configEditais, abasSelecionadas: [...atual, key] });
+                            }
+                        };
+
+                        return (
+                            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+                                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+                                    {/* Header */}
+                                    <div className="bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-4 flex items-center justify-between">
+                                        <h3 className="text-xl font-bold text-white">📋 Gerar Editais</h3>
+                                        <button onClick={() => setModalEditais(false)} className="text-white hover:text-gray-200 text-2xl font-bold">✕</button>
+                                    </div>
+
+                                    <div className="p-6 space-y-5">
+                                        {/* Seleção de Abas */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">🏢 Selecionar Abas:</label>
+                                            <div className="space-y-2">
+                                                {abasDisponiveis.map(aba => {
+                                                    const qtd = list.filter(aba.fn).length;
+                                                    return (
+                                                        <label key={aba.key} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-50">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={configEditais.abasSelecionadas.includes(aba.key)}
+                                                                onChange={() => toggleAba(aba.key)}
+                                                                className="w-4 h-4 text-teal-600"
+                                                            />
+                                                            <span className="text-sm font-medium">{aba.label}</span>
+                                                            <span className="ml-auto text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{qtd} contribuintes</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                            {selecionados.length > 0 && (
+                                                <div className="mt-2 text-sm text-teal-700 font-semibold bg-teal-50 border border-teal-200 rounded px-3 py-2">
+                                                    📊 Total selecionado: {selecionados.length} contribuintes → {numLotes} edital(is)
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Configurações */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-1">🔢 Número Inicial do Edital</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={configEditais.numeroInicial}
+                                                    onChange={e => setConfigEditais({ ...configEditais, numeroInicial: Number(e.target.value) })}
+                                                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-teal-500 outline-none"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-1">👥 Contribuintes por Edital</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="50"
+                                                    value={configEditais.empresasPorEdital}
+                                                    onChange={e => setConfigEditais({ ...configEditais, empresasPorEdital: Number(e.target.value) })}
+                                                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-teal-500 outline-none"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">📅 Data do Primeiro Edital</label>
+                                            <input
+                                                type="date"
+                                                value={configEditais.dataInicial}
+                                                onChange={e => setConfigEditais({ ...configEditais, dataInicial: e.target.value })}
+                                                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-teal-500 outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Preview das datas */}
+                                        {numLotes > 0 && datas.length > 0 && (
+                                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                                <p className="text-xs font-semibold text-gray-600 mb-2">📆 Preview — Editais {configEditais.numeroInicial} a {Number(configEditais.numeroInicial) + numLotes - 1}:</p>
+                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                    {datas.slice(0, numLotes).map((d, i) => {
+                                                        const loteStart = i * qtdPorEdital + 1;
+                                                        const loteEnd = Math.min((i + 1) * qtdPorEdital, selecionados.length);
+                                                        return (
+                                                            <div key={i} className="text-xs text-gray-600 flex gap-2">
+                                                                <span className="font-mono font-bold text-teal-700">Edital {String(Number(configEditais.numeroInicial) + i).padStart(3,'0')}</span>
+                                                                <span>— {formatarDataBR(d)}</span>
+                                                                <span className="text-gray-400">({loteStart}–{loteEnd})</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Footer */}
+                                    <div className="px-6 py-4 bg-gray-50 border-t flex gap-3">
+                                        <button
+                                            onClick={() => setModalEditais(false)}
+                                            className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                                        >
+                                            ✕ Cancelar
+                                        </button>
+                                        <button
+                                            onClick={gerarEditais}
+                                            disabled={gerandoEditais || selecionados.length === 0}
+                                            className="flex-1 px-4 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg hover:from-teal-700 hover:to-cyan-700 font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            {gerandoEditais ? (
+                                                <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Gerando...</span></>
+                                            ) : (
+                                                <span>📄 Gerar {numLotes > 0 ? numLotes : ''} Edital(is)</span>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* ⚙️ MODAL REPROCESSAR */}
                     {modalReprocessar && (
