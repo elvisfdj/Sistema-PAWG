@@ -13,9 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
-    <!-- JSZip para gerar arquivos DOCX -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
     <style>
         /* Força emojis do Twemoji (estilo Twitter) em todos os sistemas */
         img.emoji {
@@ -48,22 +46,6 @@
 
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-
-        // ============================================
-        // VERIFICAÇÃO DA BIBLIOTECA DOCX
-        // ============================================
-        console.log('🔍 Verificando bibliotecas...');
-        console.log('JSZip:', typeof JSZip);
-        console.log('FileSaver:', typeof saveAs);
-        
-        if (typeof JSZip !== 'undefined' && typeof saveAs !== 'undefined') {
-            console.log('✅ Todas as bibliotecas carregadas!');
-        } else {
-            console.error('❌ Faltam bibliotecas:', {
-                JSZip: typeof JSZip === 'undefined' ? 'FALTANDO' : 'OK',
-                FileSaver: typeof saveAs === 'undefined' ? 'FALTANDO' : 'OK'
-            });
-        }
 
         const CNAES_VISA = [
             // ========================================
@@ -2682,10 +2664,13 @@
                                 return;
                             }
                             
-                            // Verificar se JSZip está carregado
                             if (typeof JSZip === 'undefined') {
-                                alert('❌ Biblioteca JSZip não carregada.\n\nRecarregue a página (F5) e tente novamente.');
-                                console.error('JSZip não está definido. Verifique se o CDN carregou.');
+                                alert('❌ JSZip não carregada. Recarregue a página (F5).');
+                                return;
+                            }
+                            
+                            if (typeof saveAs === 'undefined') {
+                                alert('❌ FileSaver não carregada. Recarregue a página (F5).');
                                 return;
                             }
 
@@ -2693,7 +2678,6 @@
 
                             try {
                                 const numInicial = Number(configEditais.numeroInicial) || 1;
-                                
                                 const lotes = [];
                                 for (let i = 0; i < selecionados.length; i += qtdPorEdital) {
                                     lotes.push(selecionados.slice(i, i + qtdPorEdital));
@@ -2707,121 +2691,135 @@
                                     const dataEditalBR = formatarDataBR(dataEdital);
                                     const dataEditalExtensa = formatarDataExtensa(dataEdital);
 
-                                    // Criar arquivo DOCX manualmente usando JSZip
                                     const zip = new JSZip();
                                     
-                                    // [Content_Types].xml
                                     zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
+  <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
 </Types>`);
                                     
-                                    // _rels/.rels
-                                    const rels = zip.folder('_rels');
-                                    rels.file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                                    zip.folder('_rels').file('.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`);
                                     
-                                    // word/_rels/document.xml.rels
-                                    const wordFolder = zip.folder('word');
-                                    const wordRels = wordFolder.folder('_rels');
-                                    wordRels.file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                                    zip.folder('word').folder('_rels').file('document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
 </Relationships>`);
                                     
-                                    // Gerar linhas da tabela
+                                    zip.folder('word').file('styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:rPrDefault>
+  </w:docDefaults>
+</w:styles>`);
+                                    
+                                    zip.folder('word').file('fontTable.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:font w:name="Arial"><w:charset w:val="00"/><w:family w:val="swiss"/></w:font>
+</w:fonts>`);
+                                    
+                                    zip.folder('word').file('settings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>`);
+                                    
                                     let tabelaLinhas = '';
                                     lote.forEach((emp, idx) => {
                                         const fill = idx % 2 === 0 ? 'EFF6FF' : 'FFFFFF';
-                                        const nome = (emp.razaoSocial || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                                        const nome = String(emp.razaoSocial || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                                         tabelaLinhas += `
-        <w:tr>
-            <w:tc>
-                <w:tcPr><w:tcW w:w="800" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
-                <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${String(idx + 1).padStart(2, '0')}</w:t></w:r></w:p>
-            </w:tc>
-            <w:tc>
-                <w:tcPr><w:tcW w:w="1700" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
-                <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${emp.inscricaoMunicipal || ''}</w:t></w:r></w:p>
-            </w:tc>
-            <w:tc>
-                <w:tcPr><w:tcW w:w="7500" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
-                <w:p><w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>${nome.toUpperCase()}</w:t></w:r></w:p>
-            </w:tc>
-        </w:tr>`;
+      <w:tr>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="800" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
+          <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${String(idx + 1).padStart(2, '0')}</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="1700" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
+          <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>${emp.inscricaoMunicipal || ''}</w:t></w:r></w:p>
+        </w:tc>
+        <w:tc>
+          <w:tcPr><w:tcW w:w="7500" w:type="dxa"/><w:shd w:fill="${fill}"/></w:tcPr>
+          <w:p><w:r><w:t>${nome.toUpperCase()}</w:t></w:r></w:p>
+        </w:tc>
+      </w:tr>`;
                                     });
                                     
-                                    // word/document.xml
-                                    wordFolder.file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                                    zip.folder('word').file('document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <w:body>
     <w:p>
-        <w:pPr><w:jc w:val="center"/><w:spacing w:after="200"/></w:pPr>
-        <w:r><w:rPr><w:b/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t>EDITAL Nº ${numStr}/${ano}/SAR/SMF</w:t></w:r>
+      <w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr>
+      <w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>EDITAL Nº ${numStr}/${ano}/SAR/SMF</w:t></w:r>
     </w:p>
     <w:p>
-        <w:pPr><w:jc w:val="both"/><w:spacing w:after="200"/></w:pPr>
-        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Ficam notificados os contribuintes abaixo identificados, para que compareçam à Subsecretaria Adjunta de Receita da Secretaria Municipal de Fazenda, situada na Av. Arthur Bernardes, Nº 100 – Parque Flamboyant - Campos dos Goytacazes/RJ, no prazo de 10 (dez) dias úteis, a contar da publicação deste edital, para o efeito do cumprimento das obrigações tributárias de licença de funcionamento. O não comparecimento implicará nas sanções previstas em lei.</w:t></w:r>
+      <w:pPr><w:jc w:val="both"/><w:spacing w:after="240"/></w:pPr>
+      <w:r><w:t>Ficam notificados os contribuintes abaixo identificados, para que compareçam à Subsecretaria Adjunta de Receita da Secretaria Municipal de Fazenda, situada na Av. Arthur Bernardes, Nº 100 – Parque Flamboyant - Campos dos Goytacazes/RJ, no prazo de 10 (dez) dias úteis, a contar da publicação deste edital, para o efeito do cumprimento das obrigações tributárias de licença de funcionamento. O não comparecimento implicará nas sanções previstas em lei.</w:t></w:r>
     </w:p>
     <w:tbl>
       <w:tblPr>
         <w:tblW w:w="10000" w:type="dxa"/>
         <w:tblBorders>
-          <w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>
-          <w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>
+          <w:top w:val="single" w:sz="4"/>
+          <w:left w:val="single" w:sz="4"/>
+          <w:bottom w:val="single" w:sz="4"/>
+          <w:right w:val="single" w:sz="4"/>
+          <w:insideH w:val="single" w:sz="4"/>
+          <w:insideV w:val="single" w:sz="4"/>
         </w:tblBorders>
       </w:tblPr>
       <w:tr>
         <w:tc>
-            <w:tcPr><w:tcW w:w="800" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
-            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>N°</w:t></w:r></w:p>
+          <w:tcPr><w:tcW w:w="800" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
+          <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/></w:rPr><w:t>N°</w:t></w:r></w:p>
         </w:tc>
         <w:tc>
-            <w:tcPr><w:tcW w:w="1700" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
-            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Inscrição</w:t></w:r></w:p>
+          <w:tcPr><w:tcW w:w="1700" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
+          <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/></w:rPr><w:t>Inscrição</w:t></w:r></w:p>
         </w:tc>
         <w:tc>
-            <w:tcPr><w:tcW w:w="7500" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
-            <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Identificação do Contribuinte</w:t></w:r></w:p>
+          <w:tcPr><w:tcW w:w="7500" w:type="dxa"/><w:shd w:fill="2563EB"/></w:tcPr>
+          <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="FFFFFF"/></w:rPr><w:t>Identificação do Contribuinte</w:t></w:r></w:p>
         </w:tc>
       </w:tr>
       ${tabelaLinhas}
     </w:tbl>
     <w:p>
-        <w:pPr><w:jc w:val="right"/><w:spacing w:before="300" w:after="100"/></w:pPr>
-        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Campos dos Goytacazes, ${dataEditalExtensa}.</w:t></w:r>
+      <w:pPr><w:jc w:val="right"/><w:spacing w:before="360" w:after="120"/></w:pPr>
+      <w:r><w:t>Campos dos Goytacazes, ${dataEditalExtensa}.</w:t></w:r>
     </w:p>
     <w:p>
-        <w:pPr><w:jc w:val="center"/><w:spacing w:before="600" w:after="100"/></w:pPr>
-        <w:r><w:rPr><w:b/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Marcelo Alvarenga Moço</w:t></w:r>
+      <w:pPr><w:jc w:val="center"/><w:spacing w:before="720" w:after="120"/></w:pPr>
+      <w:r><w:rPr><w:b/></w:rPr><w:t>Marcelo Alvarenga Moço</w:t></w:r>
     </w:p>
     <w:p>
-        <w:pPr><w:jc w:val="center"/></w:pPr>
-        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Secretaria Municipal de Fazenda</w:t></w:r>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r><w:t>Secretaria Municipal de Fazenda</w:t></w:r>
     </w:p>
     <w:p>
-        <w:pPr><w:jc w:val="center"/></w:pPr>
-        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Subsecretario Adjunto de Receita</w:t></w:r>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r><w:t>Subsecretario Adjunto de Receita</w:t></w:r>
     </w:p>
     <w:p>
-        <w:pPr><w:jc w:val="center"/></w:pPr>
-        <w:r><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t>Mat: 13.877</w:t></w:r>
+      <w:pPr><w:jc w:val="center"/></w:pPr>
+      <w:r><w:t>Mat: 13.877</w:t></w:r>
     </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="12240" w:h="15840"/>
+      <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>
+    </w:sectPr>
   </w:body>
 </w:document>`);
 
-                                    // Gerar blob e fazer download
                                     const blob = await zip.generateAsync({type: 'blob'});
                                     saveAs(blob, `Edital_${numStr}_${ano}_SAR_SMF_${dataEditalBR.replace(/\//g, '-')}.docx`);
 
-                                    // Pequena pausa entre downloads
                                     if (i < lotes.length - 1) {
                                         await new Promise(r => setTimeout(r, 800));
                                     }
