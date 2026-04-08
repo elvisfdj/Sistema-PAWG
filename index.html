@@ -2489,13 +2489,13 @@
                                                         <td className="px-3 py-2">
                                                             <select value={l.tributacao || ''} onChange={e => update(l.id, 'tributacao', e.target.value)} className="px-2 py-1 border rounded bg-white text-xs">
                                                                 <option value="">Selecione</option>
+                                                                <option value="ISENTO">Isento</option>
+                                                                <option value="MEI">MEI</option>
+                                                                <option value="AUTONOMO">Autônomo</option>
                                                                 <option value="SIMPLES">Simples</option>
                                                                 <option value="LUCRO PRESUMIDO">L. Presumido</option>
                                                                 <option value="LUCRO REAL">L. Real</option>
-                                                                <option value="BANCO">Banco</option>
-                                                                <option value="AUTONOMO">Autônomo</option>
-                                                                <option value="ISENTO">Isento</option>
-                                                                <option value="MEI">MEI</option>
+                                                                <option value="BANCO">Banco</option>                                                                                                                              
                                                             </select>
                                                         </td>
                                                         <td className="px-3 py-2 text-center">
