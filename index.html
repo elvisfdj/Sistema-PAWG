@@ -16,6 +16,7 @@
     <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         /* Força emojis do Twemoji (estilo Twitter) em todos os sistemas */
         img.emoji {
@@ -57,9 +58,19 @@
         const INVERTEXTO_URL = 'https://api.invertexto.com/v1/cnpj/';
         const LS_TOKEN_KEY = 'pawg_token_invertexto';
 
+        // Token padrão embutido (rede interna). Para revogar/trocar:
+        // 1. Gere novo token em https://api.invertexto.com/tokens
+        // 2. Substitua a string abaixo
+        // 3. Operadores podem sobrescrever individualmente via botão "🔑 Token API"
+        const TOKEN_INVERTEXTO_DEFAULT = '26504|Em2L436w1HZKUCMK6gAs0AjxcBuAf0wX';
+
         const getTokenInvertexto = () => {
-            try { return localStorage.getItem(LS_TOKEN_KEY) || ''; }
-            catch { return ''; }
+            try {
+                const ls = localStorage.getItem(LS_TOKEN_KEY);
+                return (ls && ls.trim()) || TOKEN_INVERTEXTO_DEFAULT || '';
+            } catch {
+                return TOKEN_INVERTEXTO_DEFAULT || '';
+            }
         };
 
         const setTokenInvertexto = (token) => {
@@ -1653,11 +1664,16 @@
 
             // ============================================
             // 📑 RELATÓRIO PDF POR AUDITOR + COMPETÊNCIA
+            // Gera um ZIP com 1 PDF por auditor + 1 PDF de Resumo Geral
             // ============================================
-            const gerarRelatorioAuditores = () => {
+            const gerarRelatorioAuditores = async () => {
                 try {
                     if (typeof window.jspdf === 'undefined') {
-                        alert('❌ Biblioteca jsPDF não carregou. Verifique sua conexão com a internet e recarregue a página.');
+                        alert('❌ Biblioteca jsPDF não carregou. Verifique sua conexão e recarregue a página.');
+                        return;
+                    }
+                    if (typeof window.JSZip === 'undefined') {
+                        alert('❌ Biblioteca JSZip não carregou. Verifique sua conexão e recarregue a página.');
                         return;
                     }
                     if (!list || list.length === 0) {
@@ -1666,7 +1682,7 @@
                     }
 
                     const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                    const JSZip = window.JSZip;
 
                     // Agrupar por auditor (vazio/null vira "SEM AUDITOR ATRIBUÍDO")
                     const agrupado = {};
@@ -1676,7 +1692,6 @@
                         agrupado[aud].push(l);
                     });
 
-                    // Ordenar nomes dos auditores (vazio fica por último)
                     const nomesAuditores = Object.keys(agrupado).sort((a, b) => {
                         if (a === 'SEM AUDITOR ATRIBUÍDO') return 1;
                         if (b === 'SEM AUDITOR ATRIBUÍDO') return -1;
@@ -1685,17 +1700,22 @@
 
                     const competencia = `${MESES[mes]}/${ano}`;
                     const hoje = new Date();
-                    const MESES_EXT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
                     const dataGeracao = `Gerado em ${String(hoje.getDate()).padStart(2,'0')}/${String(hoje.getMonth()+1).padStart(2,'0')}/${hoje.getFullYear()} às ${String(hoje.getHours()).padStart(2,'0')}:${String(hoje.getMinutes()).padStart(2,'0')}`;
 
-                    let primeiraSecao = true;
-                    let totalGeralTFLF = 0, totalGeralISSQN = 0, totalGeralVISA = 0;
+                    const fmt = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-                    nomesAuditores.forEach(nomeAud => {
-                        if (!primeiraSecao) doc.addPage();
-                        primeiraSecao = false;
+                    // Sanitiza nome para uso em arquivo: remove acentos, espaços viram _, só letras/números/underscore
+                    const sanitizarNome = (nome) => {
+                        return String(nome)
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+                            .replace(/[^a-zA-Z0-9\s]/g, '')                    // remove especiais
+                            .trim()
+                            .replace(/\s+/g, '_')
+                            .substring(0, 60) || 'Auditor';
+                    };
 
-                        // Cabeçalho da seção
+                    // Funções auxiliares de cabeçalho/tabela compartilhadas
+                    const desenharCabecalhoSecao = (doc, nomeAud) => {
                         doc.setFontSize(14);
                         doc.setFont('helvetica', 'bold');
                         doc.text('RELATÓRIO DE CONTRIBUINTES POR AUDITOR', doc.internal.pageSize.getWidth() / 2, 36, { align: 'center' });
@@ -1705,8 +1725,27 @@
                         doc.text(`Competência: ${competencia}`, 40, 58);
                         doc.text(`Auditor: ${nomeAud}`, 40, 74);
                         doc.text(dataGeracao, doc.internal.pageSize.getWidth() - 40, 58, { align: 'right' });
+                    };
 
-                        // Ordenar contribuintes do auditor por inscrição
+                    const calcularTotaisAuditor = (itens) => {
+                        let subTFLF = 0, subISSQN = 0, subVISA = 0;
+                        itens.forEach(l => {
+                            subTFLF += calcTFLFReais(l.tributacao, l.tipoPessoa);
+                            subISSQN += calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa) * valorUficaAtual;
+                            subVISA += calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
+                        });
+                        return { subTFLF, subISSQN, subVISA, subTotal: subTFLF + subISSQN + subVISA };
+                    };
+
+                    // Mostrar progresso simples no botão
+                    setProcessoAviso('📑 Gerando relatórios PDF...');
+
+                    const zip = new JSZip();
+                    let totalGeralTFLF = 0, totalGeralISSQN = 0, totalGeralVISA = 0;
+
+                    // 1️⃣ Gerar 1 PDF por auditor
+                    for (let i = 0; i < nomesAuditores.length; i++) {
+                        const nomeAud = nomesAuditores[i];
                         const itens = [...agrupado[nomeAud]].sort((a, b) => {
                             const ia = parseInt(a.inscricaoMunicipal, 10);
                             const ib = parseInt(b.inscricaoMunicipal, 10);
@@ -1714,15 +1753,15 @@
                             return String(a.inscricaoMunicipal || '').localeCompare(String(b.inscricaoMunicipal || ''));
                         });
 
-                        let subTFLF = 0, subISSQN = 0, subVISA = 0;
+                        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                        desenharCabecalhoSecao(doc, nomeAud);
+
                         const rows = itens.map((l, idx) => {
                             const tflf = calcTFLFReais(l.tributacao, l.tipoPessoa);
                             const issqnU = calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa);
                             const issqn = issqnU * valorUficaAtual;
                             const visa = calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
                             const total = tflf + issqn + visa;
-                            subTFLF += tflf; subISSQN += issqn; subVISA += visa;
-                            const fmt = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                             return [
                                 String(idx + 1),
                                 l.inscricaoMunicipal || '-',
@@ -1738,12 +1777,10 @@
                             ];
                         });
 
-                        totalGeralTFLF += subTFLF;
-                        totalGeralISSQN += subISSQN;
-                        totalGeralVISA += subVISA;
-
-                        const fmt = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        const subTotal = subTFLF + subISSQN + subVISA;
+                        const tot = calcularTotaisAuditor(itens);
+                        totalGeralTFLF += tot.subTFLF;
+                        totalGeralISSQN += tot.subISSQN;
+                        totalGeralVISA += tot.subVISA;
 
                         doc.autoTable({
                             startY: 88,
@@ -1751,13 +1788,13 @@
                             body: rows,
                             foot: [[
                                 { content: `Total do auditor (${itens.length} contribuintes)`, colSpan: 7, styles: { halign: 'right', fontStyle: 'bold' } },
-                                { content: 'R$ ' + fmt(subTFLF), styles: { fontStyle: 'bold' } },
-                                { content: 'R$ ' + fmt(subISSQN), styles: { fontStyle: 'bold' } },
-                                { content: 'R$ ' + fmt(subVISA), styles: { fontStyle: 'bold' } },
-                                { content: 'R$ ' + fmt(subTotal), styles: { fontStyle: 'bold' } }
+                                { content: 'R$ ' + fmt(tot.subTFLF), styles: { fontStyle: 'bold' } },
+                                { content: 'R$ ' + fmt(tot.subISSQN), styles: { fontStyle: 'bold' } },
+                                { content: 'R$ ' + fmt(tot.subVISA), styles: { fontStyle: 'bold' } },
+                                { content: 'R$ ' + fmt(tot.subTotal), styles: { fontStyle: 'bold' } }
                             ]],
                             styles: { fontSize: 8, cellPadding: 3 },
-                            headStyles: { fillBy: 'helvetica', fillColor: [49, 46, 129], textColor: 255, fontStyle: 'bold' },
+                            headStyles: { fillColor: [49, 46, 129], textColor: 255, fontStyle: 'bold' },
                             footStyles: { fillColor: [243, 244, 246], textColor: 17 },
                             columnStyles: {
                                 0: { halign: 'center', cellWidth: 24 },
@@ -1772,63 +1809,75 @@
                                 9: { halign: 'right', cellWidth: 60 },
                                 10: { halign: 'right', cellWidth: 65 }
                             },
-                            didDrawPage: (data) => {
-                                // Rodapé com paginação
+                            didDrawPage: () => {
                                 const str = `Página ${doc.internal.getNumberOfPages()}`;
                                 doc.setFontSize(8);
                                 doc.text(str, doc.internal.pageSize.getWidth() - 40, doc.internal.pageSize.getHeight() - 16, { align: 'right' });
                             },
                             margin: { left: 40, right: 40 }
                         });
-                    });
 
-                    // Página final de totais gerais
-                    doc.addPage();
-                    doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('RESUMO GERAL DA COMPETÊNCIA', doc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
-                    doc.setFontSize(11);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(`Competência: ${competencia}`, 40, 74);
-                    doc.text(`Total de auditores com lançamentos: ${nomesAuditores.length}`, 40, 90);
-                    doc.text(`Total de contribuintes: ${list.length}`, 40, 106);
+                        // Numeração ordenada do arquivo: 01_Nome.pdf, 02_Nome.pdf...
+                        const prefixo = String(i + 1).padStart(2, '0');
+                        const nomeArquivo = `${prefixo}_${sanitizarNome(nomeAud)}.pdf`;
+                        zip.file(nomeArquivo, doc.output('arraybuffer'));
+                    }
 
-                    const fmtG = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    doc.autoTable({
+                    // 2️⃣ PDF de Resumo Geral
+                    const resumoDoc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+                    resumoDoc.setFontSize(14);
+                    resumoDoc.setFont('helvetica', 'bold');
+                    resumoDoc.text('RESUMO GERAL DA COMPETÊNCIA', resumoDoc.internal.pageSize.getWidth() / 2, 50, { align: 'center' });
+                    resumoDoc.setFontSize(11);
+                    resumoDoc.setFont('helvetica', 'normal');
+                    resumoDoc.text(`Competência: ${competencia}`, 40, 74);
+                    resumoDoc.text(`Total de auditores com lançamentos: ${nomesAuditores.length}`, 40, 90);
+                    resumoDoc.text(`Total de contribuintes: ${list.length}`, 40, 106);
+                    resumoDoc.text(dataGeracao, resumoDoc.internal.pageSize.getWidth() - 40, 74, { align: 'right' });
+
+                    resumoDoc.autoTable({
                         startY: 130,
                         head: [['Auditor', 'Contribuintes', 'TFLF', 'ISSQN', 'VISA', 'Total']],
                         body: nomesAuditores.map(nome => {
-                            let t = 0, i = 0, v = 0;
-                            agrupado[nome].forEach(l => {
-                                t += calcTFLFReais(l.tributacao, l.tipoPessoa);
-                                i += calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa) * valorUficaAtual;
-                                v += calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
-                            });
-                            return [nome, String(agrupado[nome].length), 'R$ ' + fmtG(t), 'R$ ' + fmtG(i), 'R$ ' + fmtG(v), 'R$ ' + fmtG(t + i + v)];
+                            const t = calcularTotaisAuditor(agrupado[nome]);
+                            return [nome, String(agrupado[nome].length), 'R$ ' + fmt(t.subTFLF), 'R$ ' + fmt(t.subISSQN), 'R$ ' + fmt(t.subVISA), 'R$ ' + fmt(t.subTotal)];
                         }),
                         foot: [[
                             { content: `TOTAL GERAL (${list.length} contribuintes)`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } },
-                            { content: 'R$ ' + fmtG(totalGeralTFLF), styles: { fontStyle: 'bold' } },
-                            { content: 'R$ ' + fmtG(totalGeralISSQN), styles: { fontStyle: 'bold' } },
-                            { content: 'R$ ' + fmtG(totalGeralVISA), styles: { fontStyle: 'bold' } },
-                            { content: 'R$ ' + fmtG(totalGeralTFLF + totalGeralISSQN + totalGeralVISA), styles: { fontStyle: 'bold' } }
+                            { content: 'R$ ' + fmt(totalGeralTFLF), styles: { fontStyle: 'bold' } },
+                            { content: 'R$ ' + fmt(totalGeralISSQN), styles: { fontStyle: 'bold' } },
+                            { content: 'R$ ' + fmt(totalGeralVISA), styles: { fontStyle: 'bold' } },
+                            { content: 'R$ ' + fmt(totalGeralTFLF + totalGeralISSQN + totalGeralVISA), styles: { fontStyle: 'bold' } }
                         ]],
                         styles: { fontSize: 9, cellPadding: 4 },
                         headStyles: { fillColor: [49, 46, 129], textColor: 255, fontStyle: 'bold' },
                         footStyles: { fillColor: [243, 244, 246], textColor: 17 },
                         columnStyles: {
                             0: { cellWidth: 'auto' },
-                            1: { halign: 'center', cellWidth: 70 },
-                            2: { halign: 'right', cellWidth: 90 },
-                            3: { halign: 'right', cellWidth: 90 },
-                            4: { halign: 'right', cellWidth: 90 },
-                            5: { halign: 'right', cellWidth: 100 }
+                            1: { halign: 'center', cellWidth: 90 },
+                            2: { halign: 'right', cellWidth: 100 },
+                            3: { halign: 'right', cellWidth: 100 },
+                            4: { halign: 'right', cellWidth: 100 },
+                            5: { halign: 'right', cellWidth: 110 }
                         },
                         margin: { left: 40, right: 40 }
                     });
 
-                    doc.save(`Relatorio_Auditores_${MESES[mes]}_${ano}.pdf`);
+                    zip.file('00_Resumo_Geral.pdf', resumoDoc.output('arraybuffer'));
+
+                    // 3️⃣ Gerar ZIP e baixar
+                    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Relatorios_Auditores_${MESES[mes]}_${ano}.zip`;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+                    setProcessoAviso('');
+                    alert(`✅ ZIP gerado com ${nomesAuditores.length} relatório(s) de auditor + Resumo Geral.\n\nArquivo: Relatorios_Auditores_${MESES[mes]}_${ano}.zip`);
                 } catch (err) {
+                    setProcessoAviso('');
                     console.error('Erro ao gerar relatório PDF:', err);
                     alert('Erro ao gerar relatório: ' + err.message);
                 }
