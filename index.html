@@ -86,9 +86,33 @@
         const normalizarRespostaCNPJ = (raw, fonte) => {
             if (!raw) return null;
 
-            // Se já está no formato CNPJá (tem .company), retorna direto
+            // 🎯 HEURÍSTICA MEI compartilhada (aplicada nos dois caminhos do normalizador)
+            // Razão social padrão "XX.XXX.XXX NOME": Receita gera assim pra MEI/EI sem nome fantasia.
+            // Aplicada SOMENTE quando: API não confirmou MEI E API não confirmou Simples.
+            const aplicarHeuristicaMEI = (objetoNormalizado) => {
+                if (!objetoNormalizado?.company) return objetoNormalizado;
+                const jaEhMEI = objetoNormalizado.company.simei?.optant === true;
+                const ehSimples = objetoNormalizado.company.simples?.optant === true;
+                if (jaEhMEI || ehSimples) return objetoNormalizado;
+                const razao = objetoNormalizado.company.name || '';
+                const padraoMEI = /^\d{2}\.\d{3}\.\d{3}\s+[A-ZÀ-Ú]/;
+                if (typeof razao === 'string' && padraoMEI.test(razao.trim().toUpperCase())) {
+                    console.log(`🎯 Heurística MEI ativada: "${razao}" (API não confirmou; padrão de razão social bate).`);
+                    return {
+                        ...objetoNormalizado,
+                        company: {
+                            ...objetoNormalizado.company,
+                            simei: { optant: true }
+                        },
+                        _heuristicaMEI: true
+                    };
+                }
+                return objetoNormalizado;
+            };
+
+            // Se já está no formato CNPJá (tem .company), aplica heurística e retorna
             if (raw.company && (raw.company.simei !== undefined || raw.company.simples !== undefined || raw.company.size)) {
-                return raw;
+                return aplicarHeuristicaMEI(raw);
             }
 
             // Helper: extrai true/false/undefined de várias formas (true, false, "Sim", "Não", "true", "false", "S", "N")
@@ -101,20 +125,34 @@
                 return undefined;
             };
 
-            // Tenta detectar campos de simples/MEI em vários nomes possíveis
-            const simplesObj = raw.simples_nacional || raw.simplesNacional || raw.simples || {};
-            const meiObj = raw.simei || raw.mei || {};
+            // Aliases ampliados para tolerar variação entre fornecedores
+            const simplesObj =
+                raw.simples_nacional ||
+                raw.simplesNacional ||
+                raw.simples ||
+                raw.regime_simples ||
+                raw.regimeSimples ||
+                {};
+            const meiObj =
+                raw.simei ||
+                raw.mei ||
+                raw.microempreendedor_individual ||
+                raw.microempreendedorIndividual ||
+                {};
 
-            const simplesOpt = toBool(simplesObj.optante ?? simplesObj.optant ?? simplesObj.isOptante);
-            const meiOpt = toBool(meiObj.optante ?? meiObj.optant ?? meiObj.isOptante);
+            // Booleano DEFINITIVO: usa `?? false` pra eliminar undefined.
+            // Comportamento: se a API não mencionou explicitamente, considera = não optante.
+            // Isso evita ambiguidade ("não sei" cai pra "não") e mantém previsibilidade tributária.
+            const simplesOpt = toBool(simplesObj.optante ?? simplesObj.optant ?? simplesObj.isOptante) ?? false;
+            const meiOpt = toBool(meiObj.optante ?? meiObj.optant ?? meiObj.isOptante) ?? false;
 
-            // Porte — pode vir como "MICRO EMPRESA", "ME", "Microempresa (ME)", { acronym: "ME" }, etc
+            // Porte — parsing textual (sem inferir MEI a partir do porte: SIMEI é fonte da verdade pra MEI).
+            // Aqui só normalizamos acrônimo de PORTE: ME, EPP ou DEMAIS.
             const porteRaw = raw.porte || raw.size?.acronym || raw.size?.text || raw.porte_empresa || '';
             let porteAcronym = '';
             if (typeof porteRaw === 'string') {
                 const p = porteRaw.toUpperCase();
-                if (p.includes('MEI') || p.includes('MICROEMPREEND')) porteAcronym = 'MEI';
-                else if (p.includes('MICRO') || /\bME\b/.test(p)) porteAcronym = 'ME';
+                if (p.includes('MICRO') || /\bME\b/.test(p)) porteAcronym = 'ME';
                 else if (p.includes('PEQUENO') || /\bEPP\b/.test(p)) porteAcronym = 'EPP';
                 else porteAcronym = 'DEMAIS';
             }
@@ -123,19 +161,26 @@
             const razao = raw.razao_social || raw.razaoSocial || raw.nome || raw.name || raw.company?.name || '';
             const naturezaId = raw.natureza_juridica?.codigo || raw.naturezaJuridica?.codigo || raw.nature?.id || '';
 
-            return {
+            const normalizado = {
                 company: {
                     name: razao,
                     size: { acronym: porteAcronym, text: porteRaw },
-                    simples: simplesOpt !== undefined ? { optant: simplesOpt } : {},
-                    simei: meiOpt !== undefined ? { optant: meiOpt } : {},
+                    simples: { optant: simplesOpt },
+                    simei: { optant: meiOpt },
                     nature: { id: naturezaId }
                 },
                 status: { text: typeof situacao === 'string' ? situacao : (situacao?.nome || situacao?.text || '') },
                 _fonte: fonte,
                 _raw: raw
             };
+
+            return aplicarHeuristicaMEI(normalizado);
         };
+
+        // 🎯 HELPERS DE CLASSIFICAÇÃO — fonte única de verdade pra todo o app.
+        // Não inferir MEI/Simples de outras formas; sempre passar pelos helpers.
+        const isMEI = (empresa) => empresa?.company?.simei?.optant === true;
+        const isSimples = (empresa) => empresa?.company?.simples?.optant === true;
 
         const { useState, useEffect } = React;
 
@@ -1287,15 +1332,13 @@
                     // 🎯 REGRA ANTIGA RESTAURADA — funciona com dados de qualquer fonte normalizada
                     let tributacao = '';
                     let consultaIncerta = false;
-                    const simeiOptant = data.company?.simei?.optant === true;
-                    const simplesOptant = data.company?.simples?.optant === true;
 
-                    if (simeiOptant) {
+                    if (isMEI(data)) {
                         tributacao = 'MEI';
                     } else if (porte === 'ME') {
-                        // ME sempre é SIMPLES (exceto se for MEI já detectado acima)
+                        // ME sempre é SIMPLES (exceto se for MEI já detectado acima) — regra operacional CTM Art. 359 Item 1
                         tributacao = 'SIMPLES';
-                    } else if (simplesOptant) {
+                    } else if (isSimples(data)) {
                         tributacao = 'SIMPLES';
                     } else {
                         tributacao = 'LUCRO PRESUMIDO';
@@ -2220,14 +2263,12 @@
                             if (opcoesReproc.trib) {
                                 let trib = '';
                                 const porteAtual = u.porte || c.porte;
-                                const simeiOpt = data.company?.simei?.optant === true;
-                                const simplesOpt = data.company?.simples?.optant === true;
 
-                                if (simeiOpt) {
+                                if (isMEI(data)) {
                                     trib = 'MEI';
                                 } else if (porteAtual === 'ME') {
                                     trib = 'SIMPLES';
-                                } else if (simplesOpt) {
+                                } else if (isSimples(data)) {
                                     trib = 'SIMPLES';
                                 } else {
                                     trib = 'LUCRO PRESUMIDO';
