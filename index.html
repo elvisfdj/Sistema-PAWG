@@ -53,32 +53,13 @@
         };
 
         // ============================================================
-        // 🔑 API INVERTEXTO — token salvo no localStorage do navegador
+        // 📡 APIs DE CONSULTA CNPJ
         // ============================================================
-        const INVERTEXTO_URL = 'https://api.invertexto.com/v1/cnpj/';
-        const LS_TOKEN_KEY = 'pawg_token_invertexto';
-
-        // Token padrão embutido (rede interna). Para revogar/trocar:
-        // 1. Gere novo token em https://api.invertexto.com/tokens
-        // 2. Substitua a string abaixo
-        // 3. Operadores podem sobrescrever individualmente via botão "🔑 Token API"
-        const TOKEN_INVERTEXTO_DEFAULT = '26504|Em2L436w1HZKUCMK6gAs0AjxcBuAf0wX';
-
-        const getTokenInvertexto = () => {
-            try {
-                const ls = localStorage.getItem(LS_TOKEN_KEY);
-                return (ls && ls.trim()) || TOKEN_INVERTEXTO_DEFAULT || '';
-            } catch {
-                return TOKEN_INVERTEXTO_DEFAULT || '';
-            }
-        };
-
-        const setTokenInvertexto = (token) => {
-            try {
-                if (token && token.trim()) localStorage.setItem(LS_TOKEN_KEY, token.trim());
-                else localStorage.removeItem(LS_TOKEN_KEY);
-            } catch (e) { console.warn('localStorage indisponível:', e); }
-        };
+        // Primária: open.cnpja.com (sem autenticação, retorna formato canônico .company)
+        // Secundária: publica.cnpj.ws (sem autenticação, formato em português)
+        // Ambas são públicas e gratuitas - usadas em cascata com fallback automático.
+        const OPEN_CNPJA_URL = 'https://open.cnpja.com/office/';
+        const PUBLICA_CNPJ_WS_URL = 'https://publica.cnpj.ws/cnpj/';
 
         // 🔄 NORMALIZADOR — converte resposta de QUALQUER API CNPJ pro formato esperado pelo app.
         // Formato alvo (mesmo que open.cnpja já usa):
@@ -125,30 +106,53 @@
                 return undefined;
             };
 
-            // Aliases ampliados para tolerar variação entre fornecedores
-            const simplesObj =
+            // 📋 EXTRAÇÃO Simples/MEI — suporta formatos conhecidos:
+            //
+            // open.cnpja.com:        company.simples.optant (boolean) / company.simei.optant
+            // publica.cnpj.ws:       simples: { simples: "Sim"|"Não", mei: "Sim"|"Não" }
+            // outras (genérico):     simples_nacional.optante, mei.optante, etc.
+            const simplesContainer =
                 raw.simples_nacional ||
                 raw.simplesNacional ||
                 raw.simples ||
                 raw.regime_simples ||
                 raw.regimeSimples ||
                 {};
-            const meiObj =
+            const meiContainer =
                 raw.simei ||
                 raw.mei ||
                 raw.microempreendedor_individual ||
                 raw.microempreendedorIndividual ||
                 {};
 
-            // Booleano DEFINITIVO: usa `?? false` pra eliminar undefined.
-            // Comportamento: se a API não mencionou explicitamente, considera = não optante.
-            // Isso evita ambiguidade ("não sei" cai pra "não") e mantém previsibilidade tributária.
-            const simplesOpt = toBool(simplesObj.optante ?? simplesObj.optant ?? simplesObj.isOptante) ?? false;
-            const meiOpt = toBool(meiObj.optante ?? meiObj.optant ?? meiObj.isOptante) ?? false;
+            // Para Simples: tenta optante/optant/isOptante (formato genérico) OU .simples (formato cnpj.ws)
+            const simplesOpt = toBool(
+                simplesContainer.optante ??
+                simplesContainer.optant ??
+                simplesContainer.isOptante ??
+                simplesContainer.simples       // ← cnpj.ws: raw.simples.simples = "Sim"/"Não"
+            ) ?? false;
+
+            // Para MEI: tenta optante/optant/isOptante OU .mei (formato cnpj.ws: raw.simples.mei = "Sim"/"Não")
+            // Importante: meiContainer pode ser raw.simples (no caso cnpj.ws), então .mei pega "Sim"/"Não" lá
+            const meiOpt = toBool(
+                meiContainer.optante ??
+                meiContainer.optant ??
+                meiContainer.isOptante ??
+                meiContainer.mei ??            // ← cnpj.ws: raw.simples.mei = "Sim"/"Não"
+                simplesContainer.mei           // ← redundância defensiva: alguns formatos põem mei dentro de simples
+            ) ?? false;
 
             // Porte — parsing textual (sem inferir MEI a partir do porte: SIMEI é fonte da verdade pra MEI).
             // Aqui só normalizamos acrônimo de PORTE: ME, EPP ou DEMAIS.
-            const porteRaw = raw.porte || raw.size?.acronym || raw.size?.text || raw.porte_empresa || '';
+            // open.cnpja: company.size.acronym ("ME"/"EPP"/"DEMAIS")
+            // publica.cnpj.ws: porte.descricao ("Micro Empresa"/"Empresa de Pequeno Porte"/"Demais")
+            const porteRaw =
+                (typeof raw.porte === 'string' ? raw.porte : raw.porte?.descricao) ||
+                raw.size?.acronym ||
+                raw.size?.text ||
+                raw.porte_empresa ||
+                '';
             let porteAcronym = '';
             if (typeof porteRaw === 'string') {
                 const p = porteRaw.toUpperCase();
@@ -157,9 +161,21 @@
                 else porteAcronym = 'DEMAIS';
             }
 
-            const situacao = raw.situacao || raw.situacao_cadastral || raw.status?.text || raw.status || '';
+            // Situação cadastral — cnpj.ws tem em estabelecimento.situacao_cadastral
+            const situacao =
+                raw.situacao ||
+                raw.situacao_cadastral ||
+                raw.estabelecimento?.situacao_cadastral ||
+                raw.status?.text ||
+                raw.status ||
+                '';
             const razao = raw.razao_social || raw.razaoSocial || raw.nome || raw.name || raw.company?.name || '';
-            const naturezaId = raw.natureza_juridica?.codigo || raw.naturezaJuridica?.codigo || raw.nature?.id || '';
+            const naturezaId =
+                raw.natureza_juridica?.id ||         // cnpj.ws usa .id
+                raw.natureza_juridica?.codigo ||
+                raw.naturezaJuridica?.codigo ||
+                raw.nature?.id ||
+                '';
 
             const normalizado = {
                 company: {
@@ -1252,70 +1268,69 @@
                     let data = null;
                     let fonteAPI = '';
 
-                    // 📡 ESTRATÉGIA MULTI-API: tenta invertexto.com primeiro (se token configurado),
-                    // cai pra open.cnpja.com em caso de falha ou ausência de Simples/MEI.
-                    const tokenInv = getTokenInvertexto();
+                    // 📡 ESTRATÉGIA MULTI-API:
+                    //   PRIMÁRIA: open.cnpja.com (formato canônico, sem autenticação)
+                    //   FALLBACK: publica.cnpj.ws (mesma garantia, formato em português)
+                    // Em 404 confirmado pela primária, NÃO tenta secundária (CNPJ realmente não existe).
+                    // Em outros erros (rate limit, timeout, 500), tenta a secundária.
 
-                    if (tokenInv) {
-                        try {
-                            console.log('📡 Tentando api.invertexto.com...');
-                            const respInv = await fetch(`${INVERTEXTO_URL}${cnpj}?token=${encodeURIComponent(tokenInv)}`, {
-                                headers: { 'Accept': 'application/json' }
-                            });
-                            if (respInv.ok) {
-                                const rawInv = await respInv.json();
-                                const normalizado = normalizarRespostaCNPJ(rawInv, 'invertexto');
-                                // Aceita resposta da invertexto apenas se trouxer ALGUMA info de Simples/MEI
-                                const temInfoRegime = normalizado?.company?.simei?.optant !== undefined ||
-                                                      normalizado?.company?.simples?.optant !== undefined;
-                                if (normalizado && temInfoRegime) {
-                                    data = normalizado;
-                                    fonteAPI = 'invertexto';
-                                    console.log('✅ Dados recebidos de api.invertexto.com');
-                                } else {
-                                    console.warn('⚠️ invertexto respondeu mas SEM info de Simples/MEI. Tentando fallback...');
-                                }
-                            } else if (respInv.status === 401 || respInv.status === 403) {
-                                console.warn(`⚠️ invertexto retornou ${respInv.status} (token inválido/expirado). Caindo pra open.cnpja...`);
-                                setProcessoAviso('⚠️ Token invertexto inválido - usando open.cnpja');
-                                setTimeout(() => setProcessoAviso(''), 2500);
+                    try {
+                        const url1 = `${OPEN_CNPJA_URL}${cnpj}?simples=true`;
+                        console.log('📡 Tentando open.cnpja.com...');
+                        const r1 = await fetch(url1);
+                        if (r1.ok) {
+                            const raw1 = await r1.json();
+                            const norm1 = normalizarRespostaCNPJ(raw1, 'open.cnpja');
+                            const tem1 = norm1?.company?.simei?.optant !== undefined ||
+                                         norm1?.company?.simples?.optant !== undefined;
+                            if (norm1 && tem1) {
+                                data = norm1;
+                                fonteAPI = 'open.cnpja';
+                                console.log('✅ Dados recebidos de open.cnpja.com');
                             } else {
-                                console.warn(`⚠️ invertexto erro ${respInv.status}. Caindo pra open.cnpja...`);
+                                console.warn('⚠️ open.cnpja respondeu mas sem info de Simples/MEI. Tentando fallback...');
                             }
-                        } catch (e) {
-                            console.warn('⚠️ Erro de rede invertexto:', e.message, '- caindo pra open.cnpja');
+                        } else if (r1.status === 404) {
+                            // CNPJ realmente não existe - não tenta fallback
+                            console.warn(`⚠️ CNPJ ${cnpj} não encontrado em open.cnpja (404).`);
+                            setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
+                            setTimeout(() => setProcessoAviso(''), 3000);
+                            return { success: false, error: 'CNPJ não encontrado (404)' };
+                        } else {
+                            console.warn(`⚠️ open.cnpja HTTP ${r1.status} - tentando fallback...`);
                         }
+                    } catch (e) {
+                        console.warn('⚠️ Erro de rede em open.cnpja:', e.message, '- tentando fallback...');
                     }
 
-                    // 🔄 FALLBACK: open.cnpja.com
+                    // 🔄 FALLBACK: publica.cnpj.ws
                     if (!data) {
-                        const url = `https://open.cnpja.com/office/${cnpj}?simples=true`;
-                        console.log('📡 Consultando open.cnpja.com...');
-                        const response = await fetch(url);
-                        console.log('📥 Response status:', response.status, response.statusText);
-
-                        if (!response.ok) {
-                            if (response.status === 404) {
-                                console.warn(`⚠️ CNPJ ${cnpj} não encontrado (404).`);
-                                setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
+                        try {
+                            const url2 = `${PUBLICA_CNPJ_WS_URL}${cnpj}`;
+                            console.log('📡 Consultando publica.cnpj.ws (fallback)...');
+                            const r2 = await fetch(url2);
+                            if (!r2.ok) {
+                                if (r2.status === 429) {
+                                    console.warn(`⚠️ publica.cnpj.ws - Rate limit (429).`);
+                                    setProcessoAviso('⚠️ Rate limit nas duas APIs - tentar depois');
+                                    setTimeout(() => setProcessoAviso(''), 3000);
+                                    return { success: false, error: 'Rate limit (429)' };
+                                }
+                                console.warn(`⚠️ publica.cnpj.ws HTTP ${r2.status}.`);
+                                setProcessoAviso(`⚠️ Ambas APIs falharam - Pulando...`);
                                 setTimeout(() => setProcessoAviso(''), 3000);
-                                return { success: false, error: 'CNPJ não encontrado (404)' };
+                                return { success: false, error: `Fallback HTTP ${r2.status}` };
                             }
-                            if (response.status === 429) {
-                                console.warn(`⚠️ CNPJ ${cnpj} - Rate limit (429).`);
-                                setProcessoAviso('⚠️ Rate limit - CNPJ ainda não processado');
-                                setTimeout(() => setProcessoAviso(''), 3000);
-                                return { success: false, error: 'Rate limit (429)' };
-                            }
-                            console.warn(`⚠️ CNPJ ${cnpj} - HTTP ${response.status}.`);
-                            setProcessoAviso(`⚠️ Erro HTTP ${response.status} - Pulando...`);
+                            const raw2 = await r2.json();
+                            data = normalizarRespostaCNPJ(raw2, 'publica.cnpj.ws');
+                            fonteAPI = 'publica.cnpj.ws';
+                            console.log('✅ Dados recebidos de publica.cnpj.ws');
+                        } catch (e) {
+                            console.warn('⚠️ Erro de rede em publica.cnpj.ws:', e.message);
+                            setProcessoAviso('⚠️ Ambas APIs falharam - Pulando...');
                             setTimeout(() => setProcessoAviso(''), 3000);
-                            return { success: false, error: `HTTP ${response.status}` };
+                            return { success: false, error: 'Ambas APIs falharam' };
                         }
-
-                        data = await response.json();
-                        fonteAPI = 'open.cnpja';
-                        console.log('✅ Dados recebidos de open.cnpja.com');
                     }
 
                     // Processar dados (mesma lógica)
@@ -2188,60 +2203,62 @@
                         console.log(`🔄 [${i + 1}/${listaParaReprocessar.length}] Reprocessando: ${c.razaoSocial} (${cnpj})`);
 
                         try {
-                            // 📡 ESTRATÉGIA MULTI-API: invertexto primeiro, open.cnpja como fallback
+                            // 📡 ESTRATÉGIA MULTI-API: open.cnpja primária, publica.cnpj.ws fallback
                             let data = null;
-                            const tokenInv = getTokenInvertexto();
 
-                            if (tokenInv) {
-                                try {
-                                    const respInv = await fetch(`${INVERTEXTO_URL}${cnpj}?token=${encodeURIComponent(tokenInv)}`, {
-                                        headers: { 'Accept': 'application/json' }
-                                    });
-                                    if (respInv.ok) {
-                                        const rawInv = await respInv.json();
-                                        const norm = normalizarRespostaCNPJ(rawInv, 'invertexto');
-                                        const temRegime = norm?.company?.simei?.optant !== undefined ||
-                                                          norm?.company?.simples?.optant !== undefined;
-                                        if (norm && temRegime) {
-                                            data = norm;
-                                            console.log('✅ Dados de api.invertexto.com');
-                                        }
+                            try {
+                                const r1 = await fetch(`${OPEN_CNPJA_URL}${cnpj}?simples=true`);
+                                if (r1.ok) {
+                                    const raw1 = await r1.json();
+                                    const norm = normalizarRespostaCNPJ(raw1, 'open.cnpja');
+                                    const tem = norm?.company?.simei?.optant !== undefined ||
+                                                norm?.company?.simples?.optant !== undefined;
+                                    if (norm && tem) {
+                                        data = norm;
+                                        console.log('✅ Dados de open.cnpja.com');
                                     }
-                                } catch (e) {
-                                    console.warn('⚠️ invertexto falhou no reproc:', e.message);
-                                }
-                            }
-
-                            // Fallback open.cnpja
-                            if (!data) {
-                                const url = `https://open.cnpja.com/office/${cnpj}?simples=true`;
-                                console.log('📡 Consultando open.cnpja.com (fallback)...');
-                                const response = await fetch(url);
-
-                                if (!response.ok) {
-                                    if (response.status === 404) {
-                                        console.warn(`⚠️ CNPJ ${cnpj} não encontrado (404).`);
-                                        setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
-                                        setTimeout(() => setProcessoAviso(''), 2000);
-                                        erros++;
-                                        continue;
-                                    }
-                                    if (response.status === 429) {
-                                        console.warn(`⚠️ CNPJ ${cnpj} - Rate limit (429).`);
-                                        setProcessoAviso('⚠️ Rate limit - CNPJ ainda não processado');
-                                        setTimeout(() => setProcessoAviso(''), 2000);
-                                        erros++;
-                                        continue;
-                                    }
-                                    console.warn(`⚠️ CNPJ ${cnpj} - HTTP ${response.status}.`);
-                                    setProcessoAviso(`⚠️ Erro HTTP ${response.status} - Pulando...`);
+                                } else if (r1.status === 404) {
+                                    console.warn(`⚠️ CNPJ ${cnpj} não encontrado (404).`);
+                                    setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
                                     setTimeout(() => setProcessoAviso(''), 2000);
                                     erros++;
                                     continue;
                                 }
+                            } catch (e) {
+                                console.warn('⚠️ open.cnpja falhou no reproc:', e.message);
+                            }
 
-                                data = await response.json();
-                                console.log('✅ Dados de open.cnpja.com');
+                            // Fallback publica.cnpj.ws
+                            if (!data) {
+                                try {
+                                    console.log('📡 Consultando publica.cnpj.ws (fallback)...');
+                                    const r2 = await fetch(`${PUBLICA_CNPJ_WS_URL}${cnpj}`);
+
+                                    if (!r2.ok) {
+                                        if (r2.status === 429) {
+                                            console.warn(`⚠️ Rate limit no fallback.`);
+                                            setProcessoAviso('⚠️ Rate limit - tentar depois');
+                                            setTimeout(() => setProcessoAviso(''), 2000);
+                                            erros++;
+                                            continue;
+                                        }
+                                        console.warn(`⚠️ CNPJ ${cnpj} - fallback HTTP ${r2.status}.`);
+                                        setProcessoAviso(`⚠️ Ambas APIs falharam`);
+                                        setTimeout(() => setProcessoAviso(''), 2000);
+                                        erros++;
+                                        continue;
+                                    }
+
+                                    const raw2 = await r2.json();
+                                    data = normalizarRespostaCNPJ(raw2, 'publica.cnpj.ws');
+                                    console.log('✅ Dados de publica.cnpj.ws');
+                                } catch (e) {
+                                    console.warn('⚠️ Fallback falhou:', e.message);
+                                    setProcessoAviso('⚠️ Ambas APIs falharam');
+                                    setTimeout(() => setProcessoAviso(''), 2000);
+                                    erros++;
+                                    continue;
+                                }
                             }
 
                             // 🔄 PROCESSAR DADOS
@@ -2585,25 +2602,6 @@
 
                                 <button onClick={fazerBackup} className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
                                     💾 Backup
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        const atual = getTokenInvertexto();
-                                        const msg = atual
-                                            ? `Token atual configurado:\n${atual.substring(0, 8)}...${atual.substring(atual.length - 4)}\n\nCole um novo token ou deixe em branco para REMOVER e usar só open.cnpja.com:`
-                                            : 'Token da api.invertexto.com (deixe em branco para usar só open.cnpja.com):';
-                                        const novo = prompt(msg, '');
-                                        if (novo === null) return;
-                                        setTokenInvertexto(novo);
-                                        alert(novo.trim()
-                                            ? '✅ Token salvo no navegador.\n\n⚠️ Ele fica apenas neste computador. Se trocar de máquina, configure novamente.'
-                                            : '⚙️ Token removido. As consultas usarão apenas open.cnpja.com.');
-                                    }}
-                                    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800"
-                                    title="Configurar token da API invertexto.com"
-                                >
-                                    🔑 Token API
                                 </button>
 
                                 <label className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded cursor-pointer hover:bg-orange-700">
