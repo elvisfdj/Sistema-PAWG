@@ -55,11 +55,10 @@
         // ============================================================
         // 📡 APIs DE CONSULTA CNPJ
         // ============================================================
-        // Primária: open.cnpja.com (sem autenticação, retorna formato canônico .company)
-        // Secundária: publica.cnpj.ws (sem autenticação, formato em português)
-        // Ambas são públicas e gratuitas - usadas em cascata com fallback automático.
+        // Primária: open.cnpja.com (formato canônico .company, mais detalhada)
+        // Fallback: brasilapi.com.br (open source comunidade, dados Receita Federal)
         const OPEN_CNPJA_URL = 'https://open.cnpja.com/office/';
-        const PUBLICA_CNPJ_WS_URL = 'https://publica.cnpj.ws/cnpj/';
+        const BRASILAPI_URL = 'https://brasilapi.com.br/api/cnpj/v1/';
 
         // 🔄 NORMALIZADOR — converte resposta de QUALQUER API CNPJ pro formato esperado pelo app.
         // Formato alvo (mesmo que open.cnpja já usa):
@@ -110,6 +109,7 @@
             //
             // open.cnpja.com:        company.simples.optant (boolean) / company.simei.optant
             // publica.cnpj.ws:       simples: { simples: "Sim"|"Não", mei: "Sim"|"Não" }
+            // brasilapi.com.br:      opcao_pelo_simples (boolean) / opcao_pelo_mei (boolean)
             // outras (genérico):     simples_nacional.optante, mei.optante, etc.
             const simplesContainer =
                 raw.simples_nacional ||
@@ -125,28 +125,30 @@
                 raw.microempreendedorIndividual ||
                 {};
 
-            // Para Simples: tenta optante/optant/isOptante (formato genérico) OU .simples (formato cnpj.ws)
+            // Para Simples: tenta vários paths, incluindo brasilapi (raw.opcao_pelo_simples direto na raiz)
             const simplesOpt = toBool(
+                raw.opcao_pelo_simples ??           // ← brasilapi
                 simplesContainer.optante ??
                 simplesContainer.optant ??
                 simplesContainer.isOptante ??
-                simplesContainer.simples       // ← cnpj.ws: raw.simples.simples = "Sim"/"Não"
+                simplesContainer.simples            // ← cnpj.ws: raw.simples.simples = "Sim"/"Não"
             ) ?? false;
 
-            // Para MEI: tenta optante/optant/isOptante OU .mei (formato cnpj.ws: raw.simples.mei = "Sim"/"Não")
-            // Importante: meiContainer pode ser raw.simples (no caso cnpj.ws), então .mei pega "Sim"/"Não" lá
+            // Para MEI: idem, incluindo brasilapi (raw.opcao_pelo_mei direto na raiz)
             const meiOpt = toBool(
+                raw.opcao_pelo_mei ??               // ← brasilapi
                 meiContainer.optante ??
                 meiContainer.optant ??
                 meiContainer.isOptante ??
-                meiContainer.mei ??            // ← cnpj.ws: raw.simples.mei = "Sim"/"Não"
-                simplesContainer.mei           // ← redundância defensiva: alguns formatos põem mei dentro de simples
+                meiContainer.mei ??                 // ← cnpj.ws: raw.simples.mei = "Sim"/"Não"
+                simplesContainer.mei
             ) ?? false;
 
             // Porte — parsing textual (sem inferir MEI a partir do porte: SIMEI é fonte da verdade pra MEI).
             // Aqui só normalizamos acrônimo de PORTE: ME, EPP ou DEMAIS.
-            // open.cnpja: company.size.acronym ("ME"/"EPP"/"DEMAIS")
-            // publica.cnpj.ws: porte.descricao ("Micro Empresa"/"Empresa de Pequeno Porte"/"Demais")
+            // open.cnpja:       company.size.acronym ("ME"/"EPP"/"DEMAIS")
+            // publica.cnpj.ws:  porte.descricao ("Micro Empresa"/"Empresa de Pequeno Porte"/"Demais")
+            // brasilapi:        porte (string direto: "ME"/"EPP"/"DEMAIS")
             const porteRaw =
                 (typeof raw.porte === 'string' ? raw.porte : raw.porte?.descricao) ||
                 raw.size?.acronym ||
@@ -154,15 +156,17 @@
                 raw.porte_empresa ||
                 '';
             let porteAcronym = '';
-            if (typeof porteRaw === 'string') {
+            if (typeof porteRaw === 'string' && porteRaw.trim() !== '') {
                 const p = porteRaw.toUpperCase();
                 if (p.includes('MICRO') || /\bME\b/.test(p)) porteAcronym = 'ME';
                 else if (p.includes('PEQUENO') || /\bEPP\b/.test(p)) porteAcronym = 'EPP';
                 else porteAcronym = 'DEMAIS';
             }
 
-            // Situação cadastral — cnpj.ws tem em estabelecimento.situacao_cadastral
+            // Situação cadastral — múltiplos paths
+            // brasilapi: descricao_situacao_cadastral
             const situacao =
+                raw.descricao_situacao_cadastral ||  // ← brasilapi
                 raw.situacao ||
                 raw.situacao_cadastral ||
                 raw.estabelecimento?.situacao_cadastral ||
@@ -171,11 +175,22 @@
                 '';
             const razao = raw.razao_social || raw.razaoSocial || raw.nome || raw.name || raw.company?.name || '';
             const naturezaId =
-                raw.natureza_juridica?.id ||         // cnpj.ws usa .id
+                raw.codigo_natureza_juridica ||     // ← brasilapi
+                raw.natureza_juridica?.id ||
                 raw.natureza_juridica?.codigo ||
                 raw.naturezaJuridica?.codigo ||
                 raw.nature?.id ||
                 '';
+
+            // 🚨 DETECÇÃO DE DADOS NULOS CRÍTICOS
+            // Quando a API retorna 200 OK mas com porte E simples ambos null/vazios,
+            // significa que o CNPJ existe mas a Receita ainda não publicou dados completos.
+            // Marca pra revisão manual em vez de chutar "DEMAIS/Lucro Presumido".
+            const porteVeioVazio = porteRaw === '' || porteRaw === null || porteRaw === undefined ||
+                                    (raw.porte === null) || (raw.porte?.descricao === null);
+            const simplesVeioNulo = raw.simples === null || raw.simples_nacional === null ||
+                                     (raw.opcao_pelo_simples === null && raw.opcao_pelo_mei === null);
+            const dadosCriticosFaltando = porteVeioVazio && simplesVeioNulo;
 
             const normalizado = {
                 company: {
@@ -187,8 +202,13 @@
                 },
                 status: { text: typeof situacao === 'string' ? situacao : (situacao?.nome || situacao?.text || '') },
                 _fonte: fonte,
-                _raw: raw
+                _raw: raw,
+                _dadosCriticosFaltando: dadosCriticosFaltando
             };
+
+            if (dadosCriticosFaltando) {
+                console.warn(`🚨 ${fonte} retornou OK mas dados críticos vieram nulos (porte+simples). CNPJ provavelmente recém-aberto. Marcando para revisão manual.`);
+            }
 
             return aplicarHeuristicaMEI(normalizado);
         };
@@ -1270,7 +1290,7 @@
 
                     // 📡 ESTRATÉGIA MULTI-API:
                     //   PRIMÁRIA: open.cnpja.com (formato canônico, sem autenticação)
-                    //   FALLBACK: publica.cnpj.ws (mesma garantia, formato em português)
+                    //   FALLBACK: brasilapi.com.br (open source, dados Receita Federal)
                     // Em 404 confirmado pela primária, NÃO tenta secundária (CNPJ realmente não existe).
                     // Em outros erros (rate limit, timeout, 500), tenta a secundária.
 
@@ -1303,30 +1323,36 @@
                         console.warn('⚠️ Erro de rede em open.cnpja:', e.message, '- tentando fallback...');
                     }
 
-                    // 🔄 FALLBACK: publica.cnpj.ws
+                    // 🔄 FALLBACK: brasilapi.com.br
                     if (!data) {
                         try {
-                            const url2 = `${PUBLICA_CNPJ_WS_URL}${cnpj}`;
-                            console.log('📡 Consultando publica.cnpj.ws (fallback)...');
+                            const url2 = `${BRASILAPI_URL}${cnpj}`;
+                            console.log('📡 Consultando brasilapi.com.br (fallback)...');
                             const r2 = await fetch(url2);
                             if (!r2.ok) {
                                 if (r2.status === 429) {
-                                    console.warn(`⚠️ publica.cnpj.ws - Rate limit (429).`);
+                                    console.warn(`⚠️ brasilapi - Rate limit (429).`);
                                     setProcessoAviso('⚠️ Rate limit nas duas APIs - tentar depois');
                                     setTimeout(() => setProcessoAviso(''), 3000);
                                     return { success: false, error: 'Rate limit (429)' };
                                 }
-                                console.warn(`⚠️ publica.cnpj.ws HTTP ${r2.status}.`);
+                                if (r2.status === 404) {
+                                    console.warn(`⚠️ CNPJ ${cnpj} não encontrado em brasilapi (404).`);
+                                    setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
+                                    setTimeout(() => setProcessoAviso(''), 3000);
+                                    return { success: false, error: 'CNPJ não encontrado em ambas APIs' };
+                                }
+                                console.warn(`⚠️ brasilapi HTTP ${r2.status}.`);
                                 setProcessoAviso(`⚠️ Ambas APIs falharam - Pulando...`);
                                 setTimeout(() => setProcessoAviso(''), 3000);
                                 return { success: false, error: `Fallback HTTP ${r2.status}` };
                             }
                             const raw2 = await r2.json();
-                            data = normalizarRespostaCNPJ(raw2, 'publica.cnpj.ws');
-                            fonteAPI = 'publica.cnpj.ws';
-                            console.log('✅ Dados recebidos de publica.cnpj.ws');
+                            data = normalizarRespostaCNPJ(raw2, 'brasilapi');
+                            fonteAPI = 'brasilapi';
+                            console.log('✅ Dados recebidos de brasilapi.com.br');
                         } catch (e) {
-                            console.warn('⚠️ Erro de rede em publica.cnpj.ws:', e.message);
+                            console.warn('⚠️ Erro de rede em brasilapi:', e.message);
                             setProcessoAviso('⚠️ Ambas APIs falharam - Pulando...');
                             setTimeout(() => setProcessoAviso(''), 3000);
                             return { success: false, error: 'Ambas APIs falharam' };
@@ -1348,7 +1374,14 @@
                     let tributacao = '';
                     let consultaIncerta = false;
 
-                    if (isMEI(data)) {
+                    // 🚨 Se a API retornou OK mas com dados críticos faltando (porte E simples nulos),
+                    // NÃO classifica — marca como INCERTO pra revisão manual.
+                    // Cenário típico: CNPJ recém-aberto, Receita ainda não publicou dados.
+                    if (data._dadosCriticosFaltando) {
+                        tributacao = '';
+                        consultaIncerta = true;
+                        console.warn(`🚨 CNPJ ${cnpj}: dados incompletos da Receita (porte+simples nulos). Marcado como INCERTO.`);
+                    } else if (isMEI(data)) {
                         tributacao = 'MEI';
                     } else if (porte === 'ME') {
                         // ME sempre é SIMPLES (exceto se for MEI já detectado acima) — regra operacional CTM Art. 359 Item 1
@@ -2203,7 +2236,7 @@
                         console.log(`🔄 [${i + 1}/${listaParaReprocessar.length}] Reprocessando: ${c.razaoSocial} (${cnpj})`);
 
                         try {
-                            // 📡 ESTRATÉGIA MULTI-API: open.cnpja primária, publica.cnpj.ws fallback
+                            // 📡 ESTRATÉGIA MULTI-API: open.cnpja primária, brasilapi fallback
                             let data = null;
 
                             try {
@@ -2228,16 +2261,23 @@
                                 console.warn('⚠️ open.cnpja falhou no reproc:', e.message);
                             }
 
-                            // Fallback publica.cnpj.ws
+                            // Fallback brasilapi.com.br
                             if (!data) {
                                 try {
-                                    console.log('📡 Consultando publica.cnpj.ws (fallback)...');
-                                    const r2 = await fetch(`${PUBLICA_CNPJ_WS_URL}${cnpj}`);
+                                    console.log('📡 Consultando brasilapi.com.br (fallback)...');
+                                    const r2 = await fetch(`${BRASILAPI_URL}${cnpj}`);
 
                                     if (!r2.ok) {
                                         if (r2.status === 429) {
                                             console.warn(`⚠️ Rate limit no fallback.`);
                                             setProcessoAviso('⚠️ Rate limit - tentar depois');
+                                            setTimeout(() => setProcessoAviso(''), 2000);
+                                            erros++;
+                                            continue;
+                                        }
+                                        if (r2.status === 404) {
+                                            console.warn(`⚠️ CNPJ ${cnpj} não encontrado em brasilapi (404).`);
+                                            setProcessoAviso('⚠️ CNPJ não encontrado');
                                             setTimeout(() => setProcessoAviso(''), 2000);
                                             erros++;
                                             continue;
@@ -2250,8 +2290,8 @@
                                     }
 
                                     const raw2 = await r2.json();
-                                    data = normalizarRespostaCNPJ(raw2, 'publica.cnpj.ws');
-                                    console.log('✅ Dados de publica.cnpj.ws');
+                                    data = normalizarRespostaCNPJ(raw2, 'brasilapi');
+                                    console.log('✅ Dados de brasilapi.com.br');
                                 } catch (e) {
                                     console.warn('⚠️ Fallback falhou:', e.message);
                                     setProcessoAviso('⚠️ Ambas APIs falharam');
@@ -2279,9 +2319,14 @@
                             // TRIBUTAÇÃO — regra antiga restaurada
                             if (opcoesReproc.trib) {
                                 let trib = '';
+                                let incerta = false;
                                 const porteAtual = u.porte || c.porte;
 
-                                if (isMEI(data)) {
+                                if (data._dadosCriticosFaltando) {
+                                    trib = '';
+                                    incerta = true;
+                                    console.warn(`🚨 CNPJ ${cnpj}: dados incompletos da Receita. Marcado como INCERTO.`);
+                                } else if (isMEI(data)) {
                                     trib = 'MEI';
                                 } else if (porteAtual === 'ME') {
                                     trib = 'SIMPLES';
@@ -2292,7 +2337,7 @@
                                 }
 
                                 u.tributacao = trib;
-                                u.consultaIncerta = false;
+                                u.consultaIncerta = incerta;
                             }
 
                             // VISA
@@ -2941,7 +2986,7 @@
                                                         <td className="px-3 py-2 text-center">
                                                             {consultando ? <span className="text-blue-600">🔄</span> :
                                                                 isDuplicado ? <span className="text-orange-600">⚠️</span> :
-                                                                    l.consultaIncerta ? <span className="text-yellow-600" title="Consulta retornou info incerta sobre Simples/MEI - revisar manualmente">⚠️</span> :
+                                                                    l.consultaIncerta ? <span className="text-red-600" title="Dados incompletos da Receita - revisar manualmente">🚨</span> :
                                                                         l.verificado ? <span className="text-green-600">✅</span> :
                                                                             l.editadoManualmente ? <span className="text-purple-600">☑️</span> :
                                                                                 <span className="text-gray-400">🕘</span>}
