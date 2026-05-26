@@ -60,6 +60,100 @@
         const OPEN_CNPJA_URL = 'https://open.cnpja.com/office/';
         const BRASILAPI_URL = 'https://brasilapi.com.br/api/cnpj/v1/';
 
+        // ============================================================
+        // 🚦 RATE LIMITER GLOBAL — compartilhado por TODAS as rotinas
+        // ============================================================
+        // open.cnpja.com (versão pública) permite 5 consultas/minuto por IP.
+        // Implementação: janela deslizante de timestamps. Antes de cada chamada,
+        // remove timestamps fora da janela de 60s. Se sobrar 5 ou mais, espera
+        // até a mais antiga sair da janela. Sempre adiciona o timestamp atual.
+        //
+        // Por ser declarado fora do componente, sobrevive a re-renders e é compartilhado
+        // entre consulta individual, lote de consulta e reprocessamento.
+        const RATE_LIMITER = {
+            timestamps: [],              // últimas chamadas à open.cnpja (em ms)
+            JANELA_MS: 60 * 1000,        // janela deslizante de 60 segundos
+            LIMITE_NA_JANELA: 5,         // máximo de consultas dentro da janela
+            ESPACAMENTO_MIN_MS: 12000,   // espaçamento mínimo entre chamadas consecutivas (60s/5 = 12s)
+            BACKOFF_429: [30000, 60000, 120000], // 30s, 60s, 120s — usado quando vier 429
+
+            // Espera o necessário pra respeitar o limite, depois marca a chamada atual
+            // Dois critérios combinados:
+            //   1. Janela deslizante: máximo 5 chamadas nos últimos 60s
+            //   2. Espaçamento mínimo: pelo menos 12s entre chamadas consecutivas
+            // O segundo previne burst inicial que estouraria o rate limit do servidor.
+            esperarVez: async function() {
+                while (true) {
+                    const agora = Date.now();
+                    // Limpa timestamps fora da janela
+                    this.timestamps = this.timestamps.filter(t => agora - t < this.JANELA_MS);
+
+                    // Critério 1: janela cheia → esperar mais antigo sair
+                    if (this.timestamps.length >= this.LIMITE_NA_JANELA) {
+                        const maisAntigo = this.timestamps[0];
+                        const esperaMs = this.JANELA_MS - (agora - maisAntigo) + 50;
+                        console.log(`🚦 Rate limit (janela cheia): aguardando ${(esperaMs/1000).toFixed(1)}s`);
+                        await new Promise(r => setTimeout(r, esperaMs));
+                        continue;
+                    }
+
+                    // Critério 2: espaçamento mínimo desde a última chamada
+                    if (this.timestamps.length > 0) {
+                        const ultima = this.timestamps[this.timestamps.length - 1];
+                        const desdeUltima = agora - ultima;
+                        if (desdeUltima < this.ESPACAMENTO_MIN_MS) {
+                            const esperaMs = this.ESPACAMENTO_MIN_MS - desdeUltima;
+                            console.log(`🚦 Rate limit (espaçamento): aguardando ${(esperaMs/1000).toFixed(1)}s`);
+                            await new Promise(r => setTimeout(r, esperaMs));
+                            continue;
+                        }
+                    }
+
+                    // Liberado: marca timestamp e retorna
+                    this.timestamps.push(agora);
+                    return;
+                }
+            },
+
+            // Quando vier 429, executa backoff exponencial e descarta a janela
+            // (a janela do nosso lado parece ok, mas o servidor não concorda - melhor zerar e esperar bastante)
+            backoff: async function(tentativa) {
+                const esperaMs = this.BACKOFF_429[Math.min(tentativa, this.BACKOFF_429.length - 1)];
+                console.warn(`🚦 Recebido 429 (tentativa ${tentativa + 1}). Esperando ${esperaMs/1000}s antes de tentar novamente...`);
+                await new Promise(r => setTimeout(r, esperaMs));
+                this.timestamps = [];   // zera a janela depois do backoff
+            }
+        };
+
+        // Função única de consulta com retry automático em 429.
+        // Retorna { ok, status, data } - encapsula toda a lógica de rate limit + backoff.
+        const consultarOpenCnpjaComRetry = async (cnpj) => {
+            const MAX_TENTATIVAS = 3;
+            for (let tentativa = 0; tentativa < MAX_TENTATIVAS; tentativa++) {
+                await RATE_LIMITER.esperarVez();
+                try {
+                    const r = await fetch(`${OPEN_CNPJA_URL}${cnpj}?simples=true`);
+                    if (r.status === 429) {
+                        if (tentativa < MAX_TENTATIVAS - 1) {
+                            await RATE_LIMITER.backoff(tentativa);
+                            continue;
+                        }
+                        return { ok: false, status: 429, data: null };
+                    }
+                    if (r.ok) {
+                        const data = await r.json();
+                        return { ok: true, status: r.status, data };
+                    }
+                    return { ok: false, status: r.status, data: null };
+                } catch (e) {
+                    if (tentativa === MAX_TENTATIVAS - 1) throw e;
+                    console.warn(`⚠️ Erro de rede tentativa ${tentativa + 1}:`, e.message);
+                    await new Promise(r => setTimeout(r, 5000));
+                }
+            }
+            return { ok: false, status: 0, data: null };
+        };
+
         // 🔄 NORMALIZADOR — converte resposta de QUALQUER API CNPJ pro formato esperado pelo app.
         // Formato alvo (mesmo que open.cnpja já usa):
         //   { company: { simei: { optant }, simples: { optant }, size: { acronym }, name, nature }, status: { text } }
@@ -866,7 +960,6 @@
             const [ano, setAno] = useState(new Date().getFullYear());
             const [consultandoQueue, setConsultandoQueue] = useState([]);
             const [consultasRealizadas, setConsultasRealizadas] = useState(0);
-            const [ultimaConsulta, setUltimaConsulta] = useState(null);
             const [abaAtiva, setAbaAtiva] = useState('principal');
             const [modalInserir, setModalInserir] = useState(false);
             const [formInserir, setFormInserir] = useState({ inscricao: '', documento: '', nome: '' });
@@ -1275,32 +1368,23 @@
             const consultarCNPJ = async (cnpj, id) => {
                 try {
                     console.log('🔍 Iniciando consulta CNPJ:', cnpj, 'ID:', id);
-
-                    if (ultimaConsulta) {
-                        const tempoDecorrido = Date.now() - ultimaConsulta.getTime();
-                        if (tempoDecorrido < 12000) {
-                            const espera = 12000 - tempoDecorrido;
-                            console.log('⏳ Aguardando', espera, 'ms antes de consultar...');
-                            await new Promise(resolve => setTimeout(resolve, espera));
-                        }
-                    }
+                    // (rate limit gerenciado pelo RATE_LIMITER global em consultarOpenCnpjaComRetry)
 
                     let data = null;
                     let fonteAPI = '';
 
                     // 📡 ESTRATÉGIA MULTI-API:
-                    //   PRIMÁRIA: open.cnpja.com (formato canônico, sem autenticação)
+                    //   PRIMÁRIA: open.cnpja.com (rate limiter global + retry automático em 429)
                     //   FALLBACK: brasilapi.com.br (open source, dados Receita Federal)
-                    // Em 404 confirmado pela primária, NÃO tenta secundária (CNPJ realmente não existe).
-                    // Em outros erros (rate limit, timeout, 500), tenta a secundária.
+                    // 404 na primária → CNPJ não existe, não tenta fallback.
+                    // 429 esgotado (3 tentativas com backoff) → tenta fallback.
+                    // Outros erros (5xx, timeout) → tenta fallback.
 
                     try {
-                        const url1 = `${OPEN_CNPJA_URL}${cnpj}?simples=true`;
                         console.log('📡 Tentando open.cnpja.com...');
-                        const r1 = await fetch(url1);
+                        const r1 = await consultarOpenCnpjaComRetry(cnpj);
                         if (r1.ok) {
-                            const raw1 = await r1.json();
-                            const norm1 = normalizarRespostaCNPJ(raw1, 'open.cnpja');
+                            const norm1 = normalizarRespostaCNPJ(r1.data, 'open.cnpja');
                             const tem1 = norm1?.company?.simei?.optant !== undefined ||
                                          norm1?.company?.simples?.optant !== undefined;
                             if (norm1 && tem1) {
@@ -1311,11 +1395,12 @@
                                 console.warn('⚠️ open.cnpja respondeu mas sem info de Simples/MEI. Tentando fallback...');
                             }
                         } else if (r1.status === 404) {
-                            // CNPJ realmente não existe - não tenta fallback
                             console.warn(`⚠️ CNPJ ${cnpj} não encontrado em open.cnpja (404).`);
                             setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
                             setTimeout(() => setProcessoAviso(''), 3000);
                             return { success: false, error: 'CNPJ não encontrado (404)' };
+                        } else if (r1.status === 429) {
+                            console.warn(`⚠️ open.cnpja persistentemente em 429 (após retries). Tentando fallback...`);
                         } else {
                             console.warn(`⚠️ open.cnpja HTTP ${r1.status} - tentando fallback...`);
                         }
@@ -1421,7 +1506,6 @@
                     await db.ref(`contribuintes/${ano}/${mes}/${id}`).update(atualizado);
 
                     setConsultasRealizadas(prev => prev + 1);
-                    setUltimaConsulta(new Date());
 
                     console.log('✅ Consulta concluída com sucesso');
                     return { success: true, porte, tributacao, situacao };
@@ -1486,9 +1570,7 @@
                         setProcessoItemAtual(`${item.razaoSocial || item.documento}`);
 
                         await consultarCNPJ(item.documento, item.id);
-                        if (i < naoConsultados.length - 1) {
-                            await new Promise(resolve => setTimeout(resolve, 12000));
-                        }
+                        // rate limit gerenciado pelo RATE_LIMITER global - não precisa de sleep extra
                     }
 
                     alert(`✅ Consulta concluída!\n\n${naoConsultados.length} CNPJs consultados.`);
@@ -2236,14 +2318,13 @@
                         console.log(`🔄 [${i + 1}/${listaParaReprocessar.length}] Reprocessando: ${c.razaoSocial} (${cnpj})`);
 
                         try {
-                            // 📡 ESTRATÉGIA MULTI-API: open.cnpja primária, brasilapi fallback
+                            // 📡 ESTRATÉGIA MULTI-API: open.cnpja (com rate limiter + retry 429) → brasilapi fallback
                             let data = null;
 
                             try {
-                                const r1 = await fetch(`${OPEN_CNPJA_URL}${cnpj}?simples=true`);
+                                const r1 = await consultarOpenCnpjaComRetry(cnpj);
                                 if (r1.ok) {
-                                    const raw1 = await r1.json();
-                                    const norm = normalizarRespostaCNPJ(raw1, 'open.cnpja');
+                                    const norm = normalizarRespostaCNPJ(r1.data, 'open.cnpja');
                                     const tem = norm?.company?.simei?.optant !== undefined ||
                                                 norm?.company?.simples?.optant !== undefined;
                                     if (norm && tem) {
@@ -2256,6 +2337,8 @@
                                     setTimeout(() => setProcessoAviso(''), 2000);
                                     erros++;
                                     continue;
+                                } else if (r1.status === 429) {
+                                    console.warn(`⚠️ open.cnpja persistentemente em 429 após retries. Tentando fallback...`);
                                 }
                             } catch (e) {
                                 console.warn('⚠️ open.cnpja falhou no reproc:', e.message);
@@ -2378,23 +2461,12 @@
 
                             sucessos++;
                             console.log(`✅ [${i + 1}/${listaParaReprocessar.length}] Reprocessado com sucesso`);
-
-                            // ⏳ AGUARDAR 12 SEGUNDOS antes do próximo (exceto se for o último)
-                            if (i < listaParaReprocessar.length - 1) {
-                                console.log('⏳ Aguardando 12 segundos antes do próximo...');
-                                await new Promise(resolve => setTimeout(resolve, 12000));
-                            }
+                            // rate limit gerenciado pelo RATE_LIMITER global
 
                         } catch (error) {
                             console.warn(`⚠️ Erro ao reprocessar ${cnpj}:`, error.message);
                             erros++;
-                            // Continua para o próximo sem bloquear
-                            
-                            // ⏳ AGUARDAR 12 SEGUNDOS mesmo em caso de erro (exceto se for o último)
-                            if (i < listaParaReprocessar.length - 1) {
-                                console.log('⏳ Aguardando 12 segundos antes do próximo...');
-                                await new Promise(resolve => setTimeout(resolve, 12000));
-                            }
+                            // Continua para o próximo sem bloquear (rate limit já gerenciado globalmente)
                         }
                     }
 
