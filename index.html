@@ -1394,6 +1394,22 @@
                             console.warn(`⚠️ CNPJ ${cnpj} não encontrado em open.cnpja (404).`);
                             setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
                             setTimeout(() => setProcessoAviso(''), 3000);
+
+                            // 🎯 PERSISTIR o estado de "não encontrado" pra exibir 🚨 na linha
+                            try {
+                                await db.ref(`contribuintes/${ano}/${mes}/${id}`).update({
+                                    consultaIncerta: true,
+                                    verificado: false
+                                });
+                                setList(prev => prev.map(item =>
+                                    item.id === id
+                                        ? { ...item, consultaIncerta: true, verificado: false }
+                                        : item
+                                ));
+                            } catch (e) {
+                                console.warn('⚠️ Não foi possível persistir consultaIncerta:', e.message);
+                            }
+
                             return { success: false, error: 'CNPJ não encontrado (404)' };
                         } else if (r1.status === 429) {
                             console.warn(`⚠️ open.cnpja persistentemente em 429 após retries.`);
@@ -1409,6 +1425,22 @@
                         console.warn(`🚨 CNPJ ${cnpj}: consulta falhou na open.cnpja, sem dados disponíveis.`);
                         setProcessoAviso('⚠️ Consulta falhou - revisar manualmente');
                         setTimeout(() => setProcessoAviso(''), 3000);
+
+                        // 🎯 PERSISTIR o estado de falha no Firebase pra exibir 🚨 na linha
+                        try {
+                            await db.ref(`contribuintes/${ano}/${mes}/${id}`).update({
+                                consultaIncerta: true,
+                                verificado: false
+                            });
+                            setList(prev => prev.map(item =>
+                                item.id === id
+                                    ? { ...item, consultaIncerta: true, verificado: false }
+                                    : item
+                            ));
+                        } catch (e) {
+                            console.warn('⚠️ Não foi possível persistir consultaIncerta:', e.message);
+                        }
+
                         return { success: false, error: 'Consulta open.cnpja falhou' };
                     }
 
@@ -1479,7 +1511,20 @@
                     return { success: true, porte, tributacao, situacao };
                 } catch (error) {
                     console.warn('⚠️ Erro ao consultar CNPJ', cnpj, ':', error.message);
-                    // Não bloqueia a execução - apenas registra e continua
+                    // 🎯 PERSISTIR o estado de erro pra exibir 🚨 na linha
+                    try {
+                        await db.ref(`contribuintes/${ano}/${mes}/${id}`).update({
+                            consultaIncerta: true,
+                            verificado: false
+                        });
+                        setList(prev => prev.map(item =>
+                            item.id === id
+                                ? { ...item, consultaIncerta: true, verificado: false }
+                                : item
+                        ));
+                    } catch (e) {
+                        console.warn('⚠️ Não foi possível persistir consultaIncerta:', e.message);
+                    }
                     return { success: false, error: error.message };
                 }
             };
@@ -2303,10 +2348,19 @@
                                     console.warn(`⚠️ CNPJ ${cnpj} não encontrado (404).`);
                                     setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
                                     setTimeout(() => setProcessoAviso(''), 2000);
+                                    // 🎯 PERSISTIR para exibir 🚨
+                                    try {
+                                        await db.ref(`contribuintes/${ano}/${mes}/${c.id}`).update({
+                                            consultaIncerta: true,
+                                            verificado: false
+                                        });
+                                    } catch (e) {
+                                        console.warn('⚠️ Não persistiu consultaIncerta:', e.message);
+                                    }
                                     erros++;
                                     continue;
                                 } else if (r1.status === 429) {
-                                    console.warn(`⚠️ open.cnpja persistentemente em 429 após retries. Tentando fallback...`);
+                                    console.warn(`⚠️ open.cnpja persistentemente em 429 após retries.`);
                                 }
                             } catch (e) {
                                 console.warn('⚠️ open.cnpja falhou no reproc:', e.message);
@@ -2317,6 +2371,15 @@
                                 console.warn(`🚨 CNPJ ${cnpj}: open.cnpja falhou. Pulando...`);
                                 setProcessoAviso('⚠️ Consulta falhou - revisar manualmente');
                                 setTimeout(() => setProcessoAviso(''), 2000);
+                                // 🎯 PERSISTIR para exibir 🚨
+                                try {
+                                    await db.ref(`contribuintes/${ano}/${mes}/${c.id}`).update({
+                                        consultaIncerta: true,
+                                        verificado: false
+                                    });
+                                } catch (e) {
+                                    console.warn('⚠️ Não persistiu consultaIncerta:', e.message);
+                                }
                                 erros++;
                                 continue;
                             }
@@ -3001,7 +3064,7 @@
                                                         <td className="px-3 py-2 text-center">
                                                             {consultando ? <span className="text-blue-600">🔄</span> :
                                                                 isDuplicado ? <span className="text-orange-600">⚠️</span> :
-                                                                    l.consultaIncerta ? <span className="text-red-600" title="Dados incompletos da Receita - revisar manualmente">🚨</span> :
+                                                                    l.consultaIncerta ? <span className="text-red-600" title="Falha na consulta ou dados incompletos da Receita - revisar manualmente">🚨</span> :
                                                                         l.verificado ? <span className="text-green-600">✅</span> :
                                                                             l.editadoManualmente ? <span className="text-purple-600">☑️</span> :
                                                                                 <span className="text-gray-400">🕘</span>}
