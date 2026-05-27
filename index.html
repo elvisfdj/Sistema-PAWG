@@ -53,12 +53,12 @@
         };
 
         // ============================================================
-        // 📡 APIs DE CONSULTA CNPJ
+        // 📡 API DE CONSULTA CNPJ
         // ============================================================
-        // Primária: open.cnpja.com (formato canônico .company, mais detalhada)
-        // Fallback: brasilapi.com.br (open source comunidade, dados Receita Federal)
+        // open.cnpja.com — formato canônico .company, sem autenticação.
+        // Versão pública: 5 consultas/minuto. Rate limiter global gerencia isso.
+        // Quando falhar, o CNPJ é marcado para revisão manual (sem fallback).
         const OPEN_CNPJA_URL = 'https://open.cnpja.com/office/';
-        const BRASILAPI_URL = 'https://brasilapi.com.br/api/cnpj/v1/';
 
         // ============================================================
         // 🚦 RATE LIMITER GLOBAL — compartilhado por TODAS as rotinas
@@ -199,12 +199,11 @@
                 return undefined;
             };
 
-            // 📋 EXTRAÇÃO Simples/MEI — suporta formatos conhecidos:
+            // 📋 EXTRAÇÃO Simples/MEI — atualmente usado: open.cnpja.com.
+            // Aliases extras mantidos como defesa (caso uma fonte secundária seja reintroduzida).
             //
-            // open.cnpja.com:        company.simples.optant (boolean) / company.simei.optant
-            // publica.cnpj.ws:       simples: { simples: "Sim"|"Não", mei: "Sim"|"Não" }
-            // brasilapi.com.br:      opcao_pelo_simples (boolean) / opcao_pelo_mei (boolean)
-            // outras (genérico):     simples_nacional.optante, mei.optante, etc.
+            // open.cnpja.com:    company.simples.optant (boolean) / company.simei.optant
+            // (genérico/defesa): simples_nacional.optante, opcao_pelo_simples, mei.optante, etc.
             const simplesContainer =
                 raw.simples_nacional ||
                 raw.simplesNacional ||
@@ -1373,12 +1372,9 @@
                     let data = null;
                     let fonteAPI = '';
 
-                    // 📡 ESTRATÉGIA MULTI-API:
-                    //   PRIMÁRIA: open.cnpja.com (rate limiter global + retry automático em 429)
-                    //   FALLBACK: brasilapi.com.br (open source, dados Receita Federal)
-                    // 404 na primária → CNPJ não existe, não tenta fallback.
-                    // 429 esgotado (3 tentativas com backoff) → tenta fallback.
-                    // Outros erros (5xx, timeout) → tenta fallback.
+                    // 📡 ESTRATÉGIA: open.cnpja.com com rate limiter + retry em 429.
+                    // SEM fallback: se falhar, marca pra revisão manual em vez de classificar com dados parciais.
+                    // 404 → CNPJ não existe; outros erros → revisão manual.
 
                     try {
                         console.log('📡 Tentando open.cnpja.com...');
@@ -1400,48 +1396,20 @@
                             setTimeout(() => setProcessoAviso(''), 3000);
                             return { success: false, error: 'CNPJ não encontrado (404)' };
                         } else if (r1.status === 429) {
-                            console.warn(`⚠️ open.cnpja persistentemente em 429 (após retries). Tentando fallback...`);
+                            console.warn(`⚠️ open.cnpja persistentemente em 429 após retries.`);
                         } else {
-                            console.warn(`⚠️ open.cnpja HTTP ${r1.status} - tentando fallback...`);
+                            console.warn(`⚠️ open.cnpja HTTP ${r1.status}.`);
                         }
                     } catch (e) {
-                        console.warn('⚠️ Erro de rede em open.cnpja:', e.message, '- tentando fallback...');
+                        console.warn('⚠️ Erro de rede em open.cnpja:', e.message);
                     }
 
-                    // 🔄 FALLBACK: brasilapi.com.br
+                    // Sem fallback: se a open.cnpja falhou, marca pra revisão manual
                     if (!data) {
-                        try {
-                            const url2 = `${BRASILAPI_URL}${cnpj}`;
-                            console.log('📡 Consultando brasilapi.com.br (fallback)...');
-                            const r2 = await fetch(url2);
-                            if (!r2.ok) {
-                                if (r2.status === 429) {
-                                    console.warn(`⚠️ brasilapi - Rate limit (429).`);
-                                    setProcessoAviso('⚠️ Rate limit nas duas APIs - tentar depois');
-                                    setTimeout(() => setProcessoAviso(''), 3000);
-                                    return { success: false, error: 'Rate limit (429)' };
-                                }
-                                if (r2.status === 404) {
-                                    console.warn(`⚠️ CNPJ ${cnpj} não encontrado em brasilapi (404).`);
-                                    setProcessoAviso('⚠️ CNPJ não encontrado - Pulando...');
-                                    setTimeout(() => setProcessoAviso(''), 3000);
-                                    return { success: false, error: 'CNPJ não encontrado em ambas APIs' };
-                                }
-                                console.warn(`⚠️ brasilapi HTTP ${r2.status}.`);
-                                setProcessoAviso(`⚠️ Ambas APIs falharam - Pulando...`);
-                                setTimeout(() => setProcessoAviso(''), 3000);
-                                return { success: false, error: `Fallback HTTP ${r2.status}` };
-                            }
-                            const raw2 = await r2.json();
-                            data = normalizarRespostaCNPJ(raw2, 'brasilapi');
-                            fonteAPI = 'brasilapi';
-                            console.log('✅ Dados recebidos de brasilapi.com.br');
-                        } catch (e) {
-                            console.warn('⚠️ Erro de rede em brasilapi:', e.message);
-                            setProcessoAviso('⚠️ Ambas APIs falharam - Pulando...');
-                            setTimeout(() => setProcessoAviso(''), 3000);
-                            return { success: false, error: 'Ambas APIs falharam' };
-                        }
+                        console.warn(`🚨 CNPJ ${cnpj}: consulta falhou na open.cnpja, sem dados disponíveis.`);
+                        setProcessoAviso('⚠️ Consulta falhou - revisar manualmente');
+                        setTimeout(() => setProcessoAviso(''), 3000);
+                        return { success: false, error: 'Consulta open.cnpja falhou' };
                     }
 
                     // Processar dados (mesma lógica)
@@ -2344,44 +2312,13 @@
                                 console.warn('⚠️ open.cnpja falhou no reproc:', e.message);
                             }
 
-                            // Fallback brasilapi.com.br
+                            // Sem fallback: se a open.cnpja falhou, pula este CNPJ
                             if (!data) {
-                                try {
-                                    console.log('📡 Consultando brasilapi.com.br (fallback)...');
-                                    const r2 = await fetch(`${BRASILAPI_URL}${cnpj}`);
-
-                                    if (!r2.ok) {
-                                        if (r2.status === 429) {
-                                            console.warn(`⚠️ Rate limit no fallback.`);
-                                            setProcessoAviso('⚠️ Rate limit - tentar depois');
-                                            setTimeout(() => setProcessoAviso(''), 2000);
-                                            erros++;
-                                            continue;
-                                        }
-                                        if (r2.status === 404) {
-                                            console.warn(`⚠️ CNPJ ${cnpj} não encontrado em brasilapi (404).`);
-                                            setProcessoAviso('⚠️ CNPJ não encontrado');
-                                            setTimeout(() => setProcessoAviso(''), 2000);
-                                            erros++;
-                                            continue;
-                                        }
-                                        console.warn(`⚠️ CNPJ ${cnpj} - fallback HTTP ${r2.status}.`);
-                                        setProcessoAviso(`⚠️ Ambas APIs falharam`);
-                                        setTimeout(() => setProcessoAviso(''), 2000);
-                                        erros++;
-                                        continue;
-                                    }
-
-                                    const raw2 = await r2.json();
-                                    data = normalizarRespostaCNPJ(raw2, 'brasilapi');
-                                    console.log('✅ Dados de brasilapi.com.br');
-                                } catch (e) {
-                                    console.warn('⚠️ Fallback falhou:', e.message);
-                                    setProcessoAviso('⚠️ Ambas APIs falharam');
-                                    setTimeout(() => setProcessoAviso(''), 2000);
-                                    erros++;
-                                    continue;
-                                }
+                                console.warn(`🚨 CNPJ ${cnpj}: open.cnpja falhou. Pulando...`);
+                                setProcessoAviso('⚠️ Consulta falhou - revisar manualmente');
+                                setTimeout(() => setProcessoAviso(''), 2000);
+                                erros++;
+                                continue;
                             }
 
                             // 🔄 PROCESSAR DADOS
@@ -2651,9 +2588,10 @@
                                 // 🔢 Contadores das abas (calculados uma vez, com duplicatas secundárias filtradas)
                                 const idsDupSec = getDuplicadosSecundariosIds();
                                 const semDup = list.filter(l => !idsDupSec.has(l.id));
-                                const cPrincipal = semDup.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO').length;
+                                const cPrincipal = semDup.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO' && l.tributacao !== 'ISENTO').length;
                                 const cMei = semDup.filter(l => l.tributacao === 'MEI').length;
                                 const cAuto = semDup.filter(l => l.tributacao === 'AUTONOMO').length;
+                                const cIsento = semDup.filter(l => l.tributacao === 'ISENTO').length;
                                 const cVisa = semDup.filter(l => l.precisaVisa).length;
                                 const cDup = idsDupSec.size;
                                 return (
@@ -2666,6 +2604,9 @@
                                         </button>
                                         <button onClick={() => setAbaAtiva('autonomo')} className={`px-4 py-2 font-medium ${abaAtiva === 'autonomo' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-600'}`}>
                                             🧔🏽 Autônomo ({cAuto})
+                                        </button>
+                                        <button onClick={() => setAbaAtiva('isento')} className={`px-4 py-2 font-medium ${abaAtiva === 'isento' ? 'text-yellow-600 border-b-2 border-yellow-600' : 'text-gray-600'}`}>
+                                            ✨ Isento ({cIsento})
                                         </button>
                                         <button onClick={() => setAbaAtiva('visa')} className={`px-4 py-2 font-medium ${abaAtiva === 'visa' ? 'text-purple-600 border-b-2 border-purple-600' : 'text-gray-600'}`}>
                                             🏥 VISA ({cVisa})
@@ -2961,11 +2902,13 @@
                                             const idsDuplicSecundarios = getDuplicadosSecundariosIds();
 
                                             if (abaAtiva === 'principal') {
-                                                listaExibir = listaExibir.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO' && !idsDuplicSecundarios.has(l.id));
+                                                listaExibir = listaExibir.filter(l => l.tributacao !== 'MEI' && l.tributacao !== 'AUTONOMO' && l.tributacao !== 'ISENTO' && !idsDuplicSecundarios.has(l.id));
                                             } else if (abaAtiva === 'mei') {
                                                 listaExibir = listaExibir.filter(l => l.tributacao === 'MEI' && !idsDuplicSecundarios.has(l.id));
                                             } else if (abaAtiva === 'autonomo') {
                                                 listaExibir = listaExibir.filter(l => l.tributacao === 'AUTONOMO' && !idsDuplicSecundarios.has(l.id));
+                                            } else if (abaAtiva === 'isento') {
+                                                listaExibir = listaExibir.filter(l => l.tributacao === 'ISENTO' && !idsDuplicSecundarios.has(l.id));
                                             } else if (abaAtiva === 'visa') {
                                                 listaExibir = listaExibir.filter(l => l.precisaVisa && !idsDuplicSecundarios.has(l.id));
                                             } else if (abaAtiva === 'duplicados') {
