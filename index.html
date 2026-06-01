@@ -1615,6 +1615,17 @@
                 return (base / 4) * trimestres;
             };
 
+            // 📅 Trimestre da competência aberta (autoplaceholder para autônomos).
+            // mes é 0-indexado no app (jan=0, fev=1, ...). Resultado: 1, 2, 3 ou 4.
+            const getTrimestreDaCompetencia = (mes) => Math.floor(mes / 3) + 1;
+
+            // 🎯 Trimestre efetivo: se o operador editou manualmente, respeita o salvo.
+            // Senão, retorna o trimestre calculado pela competência aberta.
+            const getTrimestreEfetivo = (l, mes) => {
+                if (l.trimestreEditadoManual && l.trimestreAbertura) return l.trimestreAbertura;
+                return getTrimestreDaCompetencia(mes);
+            };
+
             const calcVISA = (area, tributacao, porte, precisaVisa) => {
                 if (tributacao === 'MEI' || tributacao === 'ISENTO' || !precisaVisa) return 0;
                 if (!area || area === 0) return 0;
@@ -1674,7 +1685,7 @@
                 listaCalculo.forEach(l => {
                     const uficas = getPorteUFICAS(l.tributacao, l.tipoPessoa);
                     const reais = uficas * valorUficaAtual;
-                    const issqn = calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa);
+                    const issqn = calcISSQN(l.nivelISSQN, getTrimestreEfetivo(l, mes), l.issqnIsento, l.tipoPessoa);
 
                     totalUFICAS += uficas;
                     totalReais += reais;
@@ -1709,7 +1720,7 @@
                     ordemServico: '',
                     nivelISSQN: clean.length === 11 ? 'MEDIO' : 'VARIAVEL',
                     issqnIsento: false,
-                    trimestreAbertura: 1,
+                    trimestreAbertura: getTrimestreDaCompetencia(mes),
                     taxasLancadas: 'NAO',
                     verificado: false,
                     precisaVisa: false,
@@ -1788,7 +1799,7 @@
                                 areaM2: 0,
                                 nivelISSQN: isCPF ? 'MEDIO' : 'VARIAVEL',
                                 issqnIsento: false,
-                                trimestreAbertura: 1,
+                                trimestreAbertura: getTrimestreDaCompetencia(mes),
                                 taxasLancadas: 'NAO',
                                 verificado: isCPF ? true : false,
                                 precisaVisa: false,
@@ -1820,7 +1831,7 @@
                 const header = ['Inscrição', 'Documento', 'Identificação do Contribuinte', 'Porte', 'Tributação', 'N° OS', 'Auditor', 'TFLF (R$)', 'ISSQN (R$)', 'VISA (R$)', 'Verificado', 'Taxas Lançadas'];
                 const rows = list.map(l => {
                     const tflf = calcTFLFReais(l.tributacao, l.tipoPessoa);
-                    const issqnUficas = calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa);
+                    const issqnUficas = calcISSQN(l.nivelISSQN, getTrimestreEfetivo(l, mes), l.issqnIsento, l.tipoPessoa);
                     const issqnReais = issqnUficas * valorUficaAtual;
                     const visa = calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
 
@@ -1917,7 +1928,7 @@
                         let subTFLF = 0, subISSQN = 0, subVISA = 0;
                         itens.forEach(l => {
                             subTFLF += calcTFLFReais(l.tributacao, l.tipoPessoa);
-                            subISSQN += calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa) * valorUficaAtual;
+                            subISSQN += calcISSQN(l.nivelISSQN, getTrimestreEfetivo(l, mes), l.issqnIsento, l.tipoPessoa) * valorUficaAtual;
                             subVISA += calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
                         });
                         return { subTFLF, subISSQN, subVISA, subTotal: subTFLF + subISSQN + subVISA };
@@ -1944,7 +1955,7 @@
 
                         const rows = itens.map((l, idx) => {
                             const tflf = calcTFLFReais(l.tributacao, l.tipoPessoa);
-                            const issqnU = calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa);
+                            const issqnU = calcISSQN(l.nivelISSQN, getTrimestreEfetivo(l, mes), l.issqnIsento, l.tipoPessoa);
                             const issqn = issqnU * valorUficaAtual;
                             const visa = calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
                             const total = tflf + issqn + visa;
@@ -2855,7 +2866,7 @@
                                                         ordemServico: '',
                                                         nivelISSQN: clean.length === 11 ? 'MEDIO' : 'VARIAVEL',
                                                         issqnIsento: false,
-                                                        trimestreAbertura: 1,
+                                                        trimestreAbertura: getTrimestreDaCompetencia(mes),
                                                         taxasLancadas: 'NAO',
                                                         verificado: false,
                                                         precisaVisa: false,
@@ -3041,7 +3052,7 @@
 
                                             return listaExibir.map((l, idx) => {
                                                 const tflf = calcTFLFReais(l.tributacao, l.tipoPessoa);
-                                                const issqnUficas = calcISSQN(l.nivelISSQN, l.trimestreAbertura || 1, l.issqnIsento, l.tipoPessoa);
+                                                const issqnUficas = calcISSQN(l.nivelISSQN, getTrimestreEfetivo(l, mes), l.issqnIsento, l.tipoPessoa);
                                                 const issqnReais = issqnUficas * valorUficaAtual;
                                                 const visa = calcVISA(l.areaM2 || 0, l.tributacao, l.porte, l.precisaVisa);
                                                 const consultando = consultandoQueue.includes(l.id);
@@ -3156,7 +3167,18 @@
                                                             {l.tipoPessoa === 'CNPJ' ? (
                                                                 <span class="block w-full text-center text-gray-500">N/A</span>
                                                             ) : (
-                                                                <select value={l.trimestreAbertura || 1} onChange={e => update(l.id, 'trimestreAbertura', Number(e.target.value))} className="px-2 py-1 border rounded text-xs bg-white">
+                                                                <select
+                                                                    value={l.trimestreEditadoManual ? l.trimestreAbertura : getTrimestreDaCompetencia(mes)}
+                                                                    onChange={e => {
+                                                                        const novoValor = Number(e.target.value);
+                                                                        // Marca como editado manualmente apenas se difere do calculado pela competência
+                                                                        const ehEdicaoManual = novoValor !== getTrimestreDaCompetencia(mes);
+                                                                        update(l.id, 'trimestreAbertura', novoValor);
+                                                                        update(l.id, 'trimestreEditadoManual', ehEdicaoManual);
+                                                                    }}
+                                                                    className={`px-2 py-1 border rounded text-xs ${l.trimestreEditadoManual ? 'bg-yellow-50 border-yellow-400' : 'bg-white'}`}
+                                                                    title={l.trimestreEditadoManual ? 'Editado manualmente — não recalcula automaticamente' : 'Calculado automaticamente pela competência'}
+                                                                >
                                                                     <option value={1}>1°</option>
                                                                     <option value={2}>2°</option>
                                                                     <option value={3}>3°</option>
